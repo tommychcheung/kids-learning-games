@@ -233,7 +233,7 @@
             <!-- Status Indicators -->
             <div class="flex space-x-6 text-center">
                 <div class="text-lg font-bold text-yellow-400">
-                    Battle: <span id="battleCount">1</span>
+                    Battle: <span id="battleCount">1</span> / 5
                 </div>
                 <div class="text-lg font-bold text-green-400">
                     Streak: <span id="streakCount">0</span> / 3
@@ -241,24 +241,40 @@
             </div>
         </div>
 
-        <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <!-- Hero Name Input -->
-            <div class="w-full sm:w-1/2">
-                <label for="heroNameInput" class="block text-sm font-medium text-gray-300">Your Hero Name:</label>
-                <input type="text" id="heroNameInput" value="Math Warrior"
-                       class="mt-1 block w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white"
-                       maxlength="15">
-            </div>
+		<div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
+			<!-- Hero Name Input -->
+			<div class="w-full sm:w-1/2">
+				<label for="heroNameInput" class="block text-sm font-medium text-gray-300">Your Hero Name:</label>
+				<input type="text" id="heroNameInput" value="Math Warrior"
+					   class="mt-1 block w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white"
+					   maxlength="15">
+			</div>
 
-            <!-- Character Select -->
-            <div class="w-full sm:w-1/2">
-                <label for="heroClassSelect" class="block text-sm font-medium text-gray-300">Choose Class:</label>
-                <select id="heroClassSelect" class="mt-1 block w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500">
-                    <option value="0">⚔️ Balanced Blade</option>
-                    <option value="1">🛡️ Tanky Titan</option>
-                    <option value="2">🧙 Speedy Sorcerer</option>
-                </select>
-            </div>
+			<!-- Character Select -->
+			<div class="w-full sm:w-1/2">
+				<label for="heroClassSelect" class="block text-sm font-medium text-gray-300">Choose Class:</label>
+				<div class="flex items-center mt-1 space-x-2">
+					<select id="heroClassSelect" class="flex-1 p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500">
+						<option value="0">⚔️ Balanced Blade</option>
+						<option value="1">🛡️ Tanky Titan</option>
+						<option value="2">🧙 Speedy Sorcerer</option>
+					</select>
+
+					<button id="heroInfoBtn" class="flex-none p-1 rounded-full hover:bg-gray-600 text-yellow-400 hover:text-yellow-300" title="Click for hero info">
+						ⓘ
+					</button>
+				</div>
+			</div>
+			
+			<!-- Hero Info Modal (hidden by default) -->
+			<div id="heroInfoModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+				<div class="bg-gray-800 p-8 rounded-lg w-11/12 max-w-3xl relative text-white shadow-xl">
+					<h2 id="heroInfoTitle" class="text-2xl font-bold mb-4"></h2>
+					<p id="heroInfoDesc" class="mb-6 leading-relaxed"></p>
+					<ul id="heroInfoStats" class="list-disc ml-6 mb-6 space-y-1"></ul>
+					<button id="heroInfoClose" class="absolute top-4 right-4 text-red-400 hover:text-red-300 font-bold text-xl">✖</button>
+				</div>
+			</div>
         </div>
     </div>
 
@@ -374,17 +390,53 @@
     
     const MONSTERS = [
         { name: "The Error Beast", icon: '👹' },
-        { name: "The Algebra Horror", icon: '💀' },
+        { name: "The Number Nightmare", icon: '💀' },
         { name: "The Calculus Terror", icon: '👾' },
         { name: "The Trigonometry Tyrant", icon: '🐉' },
         { name: "The Final Boss of Math", icon: '👑' }
     ];
 
-    const HERO_CLASSES = [
-        { id: 0, name: "Balanced Blade", emoji: "⚔️", baseDamage: 15, baseHP: 100 },
-        { id: 1, name: "Tanky Titan", emoji: "🛡️", baseDamage: 12, baseHP: 115 },
-        { id: 2, name: "Speedy Sorcerer", emoji: "🧙", baseDamage: 18, baseHP: 85 }
-    ];
+	const HERO_CLASSES = [
+		{
+			id: 0,
+			name: "Balanced Blade",
+			emoji: "⚔️",
+			baseDamage: 15,
+			baseHP: 100,
+			desc: "Born in a small village at the edge of the kingdom, the Balanced Blade always believed in fairness and courage. From a young age, he trained tirelessly with a wooden sword, dreaming of protecting the innocent and bringing peace to the land. When the mysterious Error Beast started causing chaos in the world of numbers, he took up his sword to restore balance and show that every problem, no matter how tricky, can be solved with a clear mind and a steady hand.",
+			stats: [
+				"HP: 100",
+				"Damage: 15",
+				"Special: None"
+			]
+		},
+		{
+			id: 1,
+			name: "Tanky Titan",
+			emoji: "🛡️",
+			baseDamage: 12,
+			baseHP: 115,
+			desc: "The Tanky Titan hails from the mountains, a giant of a hero with a heart as strong as his shield. He has defended his village from countless dangers, learning that patience and protection are as important as power. When the Trigonometry Tyrant invaded the land, threatening the harmony of learning, he knew it was time to bring his mighty shield and defend the heroes who can solve any challenge. Nothing gets past his defenses!",
+			stats: [
+				"HP: 115",
+				"Damage: 12",
+				"Special: None"
+			]
+		},
+		{
+			id: 2,
+			name: "Speedy Sorcerer",
+			emoji: "🧙",
+			baseDamage: 18,
+			baseHP: 85,
+			desc: "From the magical forests of Arithmia, the Speedy Sorcerer always loved experimenting with spells and discovering new ways to solve puzzles. Tiny in size but big in intellect, he zips across the battlefield, casting magic bolts that challenge even the trickiest of foes. When the Calculus Terror began spreading confusion, he raced to the battlefield to prove that brains and speed together can overcome any obstacle.",
+			stats: [
+				"HP: 85",
+				"Damage: 18",
+				"Special: None"
+			]
+		}
+	];
 
     // --- NEW: Item Templates with Strategic Effects (12 Total) ---
     const ITEM_TEMPLATES = {
@@ -396,7 +448,7 @@
         // New Strategic Items
         'TIME_BOOST': { name: "Clock of Haste", desc: "+5 seconds to the timer for the next 5 questions.", icon: "⏱️" },
         'WEAKEN_MONSTER': { name: "Vial of Acid", desc: "Monster takes +25% damage for the next 3 correct answers.", icon: "🧪" },
-        'CRIT_CHANCE': { name: "Sharpening Stone", desc: "Next 3 hits have a 50% chance to be a 2x Critical Hit.", icon: "🔪" },
+        'CRIT_CHANCE': { name: "Blade of Fortune", desc: "Next 3 hits have a 50% chance to be a 2x Critical Hit.", icon: "🔪" },
         'STREAK_PROTECT': { name: "Iron Will Band", desc: "Next incorrect answer does NOT break your streak.", icon: "🔗" },
         'TIMER_FREEZE': { name: "Hourglass of Stasis", desc: "The next question will have no timer (0 damage on fail).", icon: "⏳" },
         'SUPER_CHARGE': { name: "Essence of Fury", desc: "Your next correct answer is a guaranteed Super Attack (3x).", icon: "⚡" },
@@ -458,6 +510,31 @@
     const itemSelectionAreaEl = document.getElementById('itemSelectionArea');
     const configPanelEl = document.getElementById('configPanel');
     const skipButtonEl = document.getElementById('skipButton');
+	
+	const heroInfoBtn = document.getElementById('heroInfoBtn');
+	const heroInfoModal = document.getElementById('heroInfoModal');
+	const heroInfoClose = document.getElementById('heroInfoClose');
+	const heroInfoTitle = document.getElementById('heroInfoTitle');
+	const heroInfoDesc = document.getElementById('heroInfoDesc');
+	const heroInfoStats = document.getElementById('heroInfoStats');
+	const heroSelect = document.getElementById('heroClassSelect');
+
+	heroInfoBtn.addEventListener('click', () => {
+		const selectedHero = HERO_CLASSES[parseInt(heroSelect.value)];
+		heroInfoTitle.textContent = `${selectedHero.emoji} ${selectedHero.name}`;
+		heroInfoDesc.textContent = selectedHero.desc;
+		heroInfoStats.innerHTML = "";
+		selectedHero.stats.forEach(stat => {
+			const li = document.createElement('li');
+			li.textContent = stat;
+			heroInfoStats.appendChild(li);
+		});
+		heroInfoModal.classList.remove('hidden');
+	});
+
+	heroInfoClose.addEventListener('click', () => {
+		heroInfoModal.classList.add('hidden');
+	});
 
     // --- Timer Logic ---
     function resetTimer() {
@@ -547,7 +624,7 @@
 
         if (!isHeroAttack) {
             // Monster damage increases heavily
-            const levelDamage = Math.floor(currentLevel / 3) * 5;
+            const levelDamage = Math.floor(currentLevel / 3) * 2;
             baseDamage += (levelDamage * battleFactor) + (baseDamage * battleFactor);
             
             // Item: Shield Wall reduces monster damage
@@ -590,37 +667,165 @@
         let q = '', a = 0;
         const multiplier = 1 + battleNum * 0.15;
         let num1, num2;
-
+		const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+		
         switch (parseInt(level)) {
-            case 1: 
-                const maxVal1 = Math.floor(20 * multiplier);
-                num1 = Math.floor(Math.random() * (maxVal1 - 5)) + 5;
-                num2 = Math.floor(Math.random() * (num1 - 1)) + 1;
-                if (Math.random() > 0.5) { q = `${num1} + ${num2} = ?`; a = num1 + num2; } 
-                else { q = `${num1} - ${num2} = ?`; a = num1 - num2; }
-                break;
-            case 3: 
+			case 1: {
+				const baseMax = 20;
+				const maxValLevel1 = Math.floor(baseMax * multiplier);
+
+				// Increase complexity based on battle number
+				const difficulty = Math.min(battleNum, 5); // 1–5
+
+				// Randomized modes that unlock gradually
+				let modes = ["simple-add", "simple-sub"];
+
+				if (difficulty >= 2) modes.push("bigger-add", "bigger-sub");
+				if (difficulty >= 3) modes.push("three-add");
+				if (difficulty >= 4) modes.push("mix-ops");
+
+				const mode = modes[Math.floor(Math.random() * modes.length)];
+
+				switch (mode) {
+
+					// -------------------------------------
+					case "simple-add":
+						num1 = rand(5, maxValLevel1);
+						num2 = rand(1, 10);
+						q = `${num1} + ${num2} = ?`;
+						a = num1 + num2;
+						break;
+
+					case "simple-sub":
+						num1 = rand(5, maxValLevel1);
+						num2 = rand(1, num1);
+						q = `${num1} - ${num2} = ?`;
+						a = num1 - num2;
+						break;
+
+					// -------------------------------------
+					case "bigger-add": // unlocked battle >=2
+						num1 = rand(10, maxValLevel1);
+						num2 = rand(10, maxValLevel1);
+						q = `${num1} + ${num2} = ?`;
+						a = num1 + num2;
+						break;
+
+					case "bigger-sub":
+						num1 = rand(15, maxValLevel1);
+						num2 = rand(5, num1);
+						q = `${num1} - ${num2} = ?`;
+						a = num1 - num2;
+						break;
+
+					// -------------------------------------
+					case "three-add": // unlocked battle >=3
+						num1 = rand(5, maxValLevel1);
+						num2 = rand(5, maxValLevel1);
+						let num3 = rand(1, 10);
+						q = `${num1} + ${num2} + ${num3} = ?`;
+						a = num1 + num2 + num3;
+						break;
+
+					// -------------------------------------
+					case "mix-ops": // unlocked battle >=4
+						num1 = rand(5, maxValLevel1);
+						num2 = rand(1, 10);
+						let num4 = rand(1, 10);
+						if (Math.random() < 0.5) {
+							q = `${num1} + ${num2} - ${num4} = ?`;
+							a = num1 + num2 - num4;
+						} else {
+							q = `${num1} - ${num2} + ${num4} = ?`;
+							a = num1 - num2 + num4;
+						}
+						break;
+				}
+				break;
+			}
+            case 3: {
                 const maxFactor = Math.floor(12 * multiplier);
                 num1 = Math.floor(Math.random() * (maxFactor - 2)) + 2;
                 num2 = Math.floor(Math.random() * (maxFactor - 2)) + 2;
-                if (Math.random() > 0.5) { q = `$${num1} \\times ${num2} = ? $`; a = num1 * num2; } 
-                else { a = num1 * num2; q = `$${a} \\div ${num1} = ? $`; a = num2; }
+				const product = num1 * num2;
+				
+				// Increase complexity based on battle number
+				const difficulty = Math.min(battleNum, 5); // 1–5
+
+				// Randomized modes that unlock gradually
+				let modes = ["simple-multiplication"];
+
+				if (difficulty >= 2) modes.push("simple-division");
+				if (difficulty >= 3) modes.push("missing-factor");
+				if (difficulty >= 4) modes.push("multi-step");
+				
+				const mode = modes[Math.floor(Math.random() * modes.length)];
+
+				switch (mode) {
+
+					// -------------------------------------
+					case "simple-multiplication":
+						q = `${num1} × ${num2} = ?`;
+						a = product;
+						break;
+					
+					// -------------------------------------
+					case "simple-division":
+						q = `${product} ÷ ${num1} = ?`;
+						a = num2;
+						break;
+					
+					// -------------------------------------
+					case "missing-factor":
+						if (Math.random() < 0.5) {
+							// ? × num2 = product
+							q = `? × ${num2} = ${product}`;
+							a = num1;
+						} else {
+							// num1 × ? = product
+							q = `${num1} × ? = ${product}`;
+							a = num2;
+						}
+						break;
+						
+					// -------------------------------------
+					case "multi-step":
+						const addOrSub = Math.random() < 0.5 ? "+" : "-";
+						const extra = Math.floor(Math.random() * 10) + 1;
+
+						if (addOrSub === "+") {
+							q = `${num1} × ${num2} + ${extra} = ?`;
+							a = product + extra;
+						} else {
+							// Ensure no negative answers
+							const safeExtra = Math.min(extra, product - 1);
+							q = `${num1} × ${num2} - ${safeExtra} = ?`;
+							a = product - safeExtra;
+						}
+						break;	
+				}
                 break;
+			}
 			case 6:
 				if (Math.random() > 0.5) { 
 					num1 = parseFloat((Math.random() * (10 * multiplier) + 1).toFixed(2));
 					num2 = parseFloat((Math.random() * (5 * multiplier) + 1).toFixed(2));
 
-					a = parseFloat((num1 + num2).toFixed(1));
+					const exactSum = num1 + num2;
+					a = parseFloat(exactSum.toFixed(1)); // Correct rounding to 1 decimal
 
-					q = `Round to 1 decimal place: $${num1} + ${num2} = ? $`;
+					q = `Round to 1 decimal place: ${num1} + ${num2} = ?`;
 				} else { 
-					num1 = Math.floor(Math.random() * 5) + 2; 
-					num2 = Math.floor(Math.random() * (num1 - 1)) + 1; 
+					const denomMax = Math.floor(5 * multiplier) + 2; 
+					const numMax   = Math.max(1, Math.floor(denomMax * 0.8));
 
-					a = parseFloat((num2 / num1).toFixed(2));
+					num1 = rand(2, denomMax);       // denominator
+					num2 = rand(1, Math.min(numMax, num1 - 1));  // numerator < denominator
 
-					q = `Round to 2 decimal places: What is $${num2}/${num1}$ as a decimal?`;
+					const decimalValue = num2 / num1;
+					a = parseFloat(decimalValue.toFixed(2)); // Always 2 decimals
+
+					q = `Round to 2 decimal places: What is ${num2}/${num1} as a decimal?`;
 				}
 				break;
             case 9:
@@ -634,7 +839,7 @@
 						B = Math.floor(Math.random() * 15) + 3; 
 						xVal = Math.floor(Math.random() * 10) + 1;
 						C = A * xVal + B;
-						q = `Solve for x: $${A}x + ${B} = ${C}$`;
+						q = `Solve for x: ${A}x + ${B} = ${C}`;
 						a = xVal;
 						break;
 
@@ -644,7 +849,7 @@
 						B = Math.floor(Math.random() * 10) + 1;
 						xVal = Math.floor(Math.random() * 10) + 1;
 						C = A * xVal - B;
-						q = `Solve for x: $${A}x - ${B} = ${C}$`;
+						q = `Solve for x: ${A}x - ${B} = ${C}`;
 						a = xVal;
 						break;
 
@@ -654,7 +859,7 @@
 						xVal = Math.floor(Math.random() * 10) + 1;
 						B = A * xVal + (Math.floor(Math.random() * 10) + 3);
 						C = B - A * xVal;
-						q = `Solve for x: $${B} - ${A}x = ${C}$`;
+						q = `Solve for x: ${B} - ${A}x = ${C}`;
 						a = xVal;
 						break;
 
@@ -664,7 +869,7 @@
 						B = Math.floor(Math.random() * 10) + 1;
 						xVal = Math.floor(Math.random() * 10) + 1;
 						C = (xVal + B) / A;
-						q = `Solve for x: $\\frac{x + ${B}}{${A}} = ${C}$`;
+						q = `Solve for x: (x + ${B}) / ${A} = ${C}`;
 						a = xVal;
 						break;
 
@@ -674,7 +879,7 @@
 						B = Math.floor(Math.random() * 10) + 1;
 						xVal = Math.floor(Math.random() * 10) + 1;
 						C = A * (xVal - B);
-						q = `Solve for x: $${A}(x - ${B}) = ${C}$`;
+						q = `Solve for x: ${A}(x - ${B}) = ${C}`;
 						a = xVal;
 						break;
 
@@ -684,29 +889,98 @@
 						B = Math.floor(Math.random() * 4) + 1;
 						xVal = Math.floor(Math.random() * 10) + 1;
 						C = (A + B) * xVal;
-						q = `Solve for x: $${A}x + ${B}x = ${C}$`;
+						q = `Solve for x: ${A}x + ${B}x = ${C}`;
 						a = xVal;
 						break;
 				}
 
 				break;
 
-            case 12: 
-                const ops = ['sin(0)', 'cos(\\pi)', 'tan(\\pi/4)', 'x^2 deriv', '2x^3 deriv', '3x^2+2x deriv'];
-                const op = ops[Math.floor(Math.random() * ops.length)];
+			case 12: {
+				const types = ['trig-eval', 'trig-solve', 'derivative', 'multi-step'];
+				const type = types[Math.floor(Math.random() * types.length)];
 
-                if (op.includes('deriv')) {
-                    if (op === 'x^2 deriv') { q = `Find the derivative of $f(x) = x^2$ at $x=${Math.floor(5 * multiplier) + 1}$`; a = 2 * (Math.floor(5 * multiplier) + 1); } 
-                    else if (op === '2x^3 deriv') { q = `Find the derivative of $f(x) = 2x^3$ at $x=1$`; a = 6; } 
-                    else { q = `Find the derivative of $f(x) = 3x^2 + 2x$ at $x=2$`; a = 14; }
-                } else {
-                    switch(op) {
-                        case 'sin(0)': q = '$\\sin(0) = ? $'; a = 0; break;
-                        case 'cos(\\pi)': q = '$\\cos(\\pi) = ? $'; a = -1; break;
-                        case 'tan(\\pi/4)': q = '$\\tan(\\pi/4) = ? $'; a = 1; break;
-                    }
-                }
-                break;
+				switch(type) {
+
+					// ----------------------
+					case 'trig-eval':
+						const trigVals = [
+							{ q: 'sin(π/6) = ?', a: 0.5 },
+							{ q: 'cos(π/3) = ?', a: 0.5 },
+							{ q: 'tan(π/4) = ?', a: 1 },
+							{ q: 'sin(π/2) = ?', a: 1 },
+							{ q: 'cos(0) = ?', a: 1 }
+						];
+						const trigChoice = trigVals[Math.floor(Math.random() * trigVals.length)];
+						q = trigChoice.q;
+						a = trigChoice.a;
+						break;
+
+					// ----------------------
+					case 'trig-solve':
+						const angle = Math.floor(Math.random() * 5 + 1) * 10; // 10°, 20°, ..., 50°
+						if (Math.random() < 0.5) {
+							q = `Solve for x: sin(x°) = 0.5, 0 ≤ x ≤ 180`;
+							a = [30, 150]; // degrees
+						} else {
+							q = `Solve for x: cos(x°) = 0.5, 0 ≤ x ≤ 180`;
+							a = [60, 300]; // degrees
+						}
+						break;
+
+					// ----------------------
+					case 'derivative':
+						const xVal = Math.floor(Math.random() * 5) + 1;
+						const derivTypes = ['x^2', '2x^3', '3x^2 + 2x', 'x*sin(x)', 'x^2*cos(x)'];
+						const derivChoice = derivTypes[Math.floor(Math.random() * derivTypes.length)];
+
+						if (derivChoice === 'x^2') {
+							q = `Find f'(x) of f(x) = x^2 at x = ${xVal}`;
+							a = 2 * xVal;
+						} else if (derivChoice === '2x^3') {
+							q = `Find f'(x) of f(x) = 2x^3 at x = ${xVal}`;
+							a = 6 * (xVal ** 2);
+						} else if (derivChoice === '3x^2 + 2x') {
+							q = `Find f'(x) of f(x) = 3x^2 + 2x at x = ${xVal}`;
+							a = 6 * xVal + 2;
+						} else if (derivChoice === 'x*sin(x)') {
+							q = `Find f'(x) of f(x) = x*sin(x) at x = ${xVal}`;
+							a = Math.sin(xVal) + xVal * Math.cos(xVal); // approximate decimal
+						} else if (derivChoice === 'x^2*cos(x)') {
+							q = `Find f'(x) of f(x) = x^2*cos(x) at x = ${xVal}`;
+							a = 2 * xVal * Math.cos(xVal) - xVal**2 * Math.sin(xVal); // approximate decimal
+						}
+						break;
+
+					// ----------------------
+					case 'multi-step':
+						const n1 = Math.floor(Math.random() * 10) + 1;
+						const n2 = Math.floor(Math.random() * 5) + 1;
+						const ops = ['+', '-'];
+						const op1 = ops[Math.floor(Math.random() * ops.length)];
+						const op2 = ops[Math.floor(Math.random() * ops.length)];
+
+						if (op1 === '+') {
+							if (op2 === '+') {
+								q = `${n1} * ${n2} + ${n1} + ${n2} = ?`;
+								a = n1 * n2 + n1 + n2;
+							} else {
+								q = `${n1} * ${n2} + ${n1} - ${n2} = ?`;
+								a = n1 * n2 + n1 - n2;
+							}
+						} else {
+							if (op2 === '+') {
+								q = `${n1} * ${n2} - ${n1} + ${n2} = ?`;
+								a = n1 * n2 - n1 + n2;
+							} else {
+								q = `${n1} * ${n2} - ${n1} - ${n2} = ?`;
+								a = n1 * n2 - n1 - n2;
+							}
+						}
+						break;
+				}
+				break;
+			}
         }
 
         if (level >= 6) { a = parseFloat(a.toFixed(2)); } else { a = Math.round(a); }
