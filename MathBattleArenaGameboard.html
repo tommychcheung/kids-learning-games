@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Battle Arena</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+	
+	<script>
+	window.MathJax = {
+	  tex: {
+		inlineMath: [['$', '$'], ['\\(', '\\)']],
+		displayMath: []   // <---- disables display mode entirely
+	  },
+	  svg: {
+		fontCache: 'global'
+	  }
+	};
+	</script>
+
+	<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+	
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0d1117; /* Dark background */
+            color: #e6e6e6;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        .game-container {
+            max-width: 900px;
+            width: 100%;
+            background: #161b22;
+            border-radius: 1rem;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            padding: 1.5rem;
+            border: 3px solid #30363d;
+        }
+        .health-bar-bg {
+            background-color: #30363d;
+            border-radius: 9999px;
+            overflow: hidden;
+            border: 2px solid #555;
+            height: 20px;
+        }
+        .health-fill {
+            transition: width 0.5s ease-in-out, background-color 0.5s;
+            height: 100%;
+            border-radius: 9999px;
+        }
+        /* FIXED HEIGHT CONTENT AREA - Prevents scrolling */
+        .content-area-fixed {
+            min-height: 220px; /* Fixed height for message, timer, question, and input */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-start;
+        }
+        .message-box {
+            min-height: 50px;
+            background-color: #21262d;
+            border: 1px solid #30363d;
+            border-radius: 0.5rem;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+            text-align: center;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        .attack-btn {
+            background: linear-gradient(180deg, #2b6cb0, #2c5282);
+            transition: all 0.2s;
+            box-shadow: 0 4px 0 #1c3d5a;
+        }
+        .attack-btn:hover {
+            background: linear-gradient(180deg, #3182ce, #2b6cb0);
+            box-shadow: 0 2px 0 #1c3d5a;
+            transform: translateY(2px);
+        }
+        .attack-btn:active {
+            transform: translateY(4px);
+            box-shadow: none;
+        }
+        .character-icon {
+            font-size: 5rem;
+            transition: transform 0.1s, filter 0.3s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 5rem;
+        }
+        /* Item Card Styling */
+        .item-card {
+            background-color: #21262d;
+            border: 2px solid #30363d;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+        .item-card:hover {
+            border-color: #4f46e5;
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Leaderboard styling */
+        .leaderboard-table {
+            border-collapse: collapse;
+            width: 100%;
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 0.75rem;
+            border-bottom: 1px solid #30363d;
+            text-align: left;
+        }
+        .leaderboard-table th {
+            background-color: #21262d;
+            color: #90cdf4;
+            font-weight: bold;
+        }
+        .leaderboard-table tr:hover {
+            background-color: #1a2027;
+        }
+		
+		mjx-container {
+			display: inline-flex !important;
+			align-items: center;
+			justify-content: center;
+			margin: 10 !important;
+			padding: 10 !important;
+			font-size: 1em !important;
+		}
+
+		mjx-container[jax="SVG"] {
+			margin: 0 !important;
+			padding: 0 !important;
+		}
+		
+		#questionDisplayEl {
+			white-space: nowrap;
+		}
+        
+		@keyframes heroAttack {
+			0%   { transform: translateX(0) rotate(0deg); }
+			30%  { transform: translateX(25px) rotate(10deg) scale(1.1); }
+			60%  { transform: translateX(-5px) rotate(-5deg) scale(1.05); }
+			100% { transform: translateX(0) rotate(0deg) scale(1); }
+		}
+
+		@keyframes monsterDamage {
+			0%   { transform: scale(1); }
+			30%  { transform: scale(1.2) rotate(5deg); }
+			60%  { transform: scale(0.95) rotate(-3deg); }
+			100% { transform: scale(1); }
+		}
+
+		@keyframes monsterAttack {
+			0%   { transform: translateX(0) rotate(0deg); }
+			25%  { transform: translateX(-25px) rotate(-10deg) scale(1.1); }
+			50%  { transform: translateX(10px) rotate(5deg) scale(1.05); }
+			75%  { transform: translateX(-5px) rotate(-3deg); }
+			100% { transform: translateX(0) rotate(0deg) scale(1); }
+		}
+
+		@keyframes heroDamage {
+			0%   { transform: scale(1); }
+			25%  { transform: scale(1.2) rotate(-5deg); }
+			50%  { transform: scale(0.95) rotate(3deg); }
+			75%  { transform: scale(1.1) rotate(-2deg); }
+			100% { transform: scale(1); }
+		}
+
+		@keyframes superFlash {
+			0%   { background-color: rgba(255,255,255,0); }
+			25%  { background-color: rgba(255,255,255,0.6); }
+			50%  { background-color: rgba(255,255,255,0.8); }
+			75%  { background-color: rgba(255,255,255,0.6); }
+			100% { background-color: rgba(255,255,255,0); }
+		}
+
+		@keyframes superAttackShake {
+			0%   { transform: translateX(0); }
+			10%  { transform: translateX(-8px) rotate(-2deg); }
+			20%  { transform: translateX(8px) rotate(2deg); }
+			30%  { transform: translateX(-6px) rotate(-1deg); }
+			40%  { transform: translateX(6px) rotate(1deg); }
+			50%  { transform: translateX(-4px) rotate(-1deg); }
+			60%  { transform: translateX(4px) rotate(1deg); }
+			70%  { transform: translateX(-2px) rotate(0deg); }
+			80%  { transform: translateX(2px) rotate(0deg); }
+			100% { transform: translateX(0); }
+		}
+		
+		.hero-attack-effect { animation: heroAttack 0.5s ease-out forwards; }
+		.monster-damage-effect { animation: monsterDamage 0.5s ease-out forwards; }
+		.monster-attack-effect { animation: monsterAttack 0.5s ease-in-out forwards; }
+		.hero-damage-effect { animation: heroDamage 0.5s ease-in-out forwards; }
+		.super-flash-effect { animation: superFlash 0.6s ease-in-out forwards; }
+		.shake-effect { animation: superAttackShake 0.6s ease-in-out forwards; }
+
+    </style>
+</head>
+<body>
+
+<div id="gameApp" class="game-container">
+    <h1 class="text-3xl font-black text-center mb-6 text-yellow-300">⚔️ Math Battle Arena 🛡️</h1>
+
+    <!-- Configuration Panel -->
+    <div id="configPanel" class="bg-gray-800 p-4 rounded-lg mb-6 shadow-xl">
+        <div class="flex flex-col sm:flex-row justify-between items-center mb-4">
+            <!-- Level Select -->
+            <div class="mb-4 sm:mb-0">
+                <label for="level" class="text-lg font-semibold text-gray-300 mr-3">Choose Level:</label>
+                <select id="level" class="p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500">
+                    <option value="1">G1 (Addition/Subtraction)</option>
+                    <option value="3">G3 (Multiplication/Division)</option>
+                    <option value="6">G6 (Fractions/Decimals)</option>
+                    <option value="9">G9 (Algebra/Equations)</option>
+                    <option value="12">G12 (Trigonometry/Calculus)</option>
+                </select>
+            </div>
+            <!-- Status Indicators -->
+            <div class="flex space-x-6 text-center">
+                <div class="text-lg font-bold text-yellow-400">
+                    Battle: <span id="battleCount">1</span>
+                </div>
+                <div class="text-lg font-bold text-green-400">
+                    Streak: <span id="streakCount">0</span> / 3
+                </div>
+            </div>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-between items-center space-y-4 sm:space-y-0 sm:space-x-4">
+            <!-- Hero Name Input -->
+            <div class="w-full sm:w-1/2">
+                <label for="heroNameInput" class="block text-sm font-medium text-gray-300">Your Hero Name:</label>
+                <input type="text" id="heroNameInput" value="Math Warrior"
+                       class="mt-1 block w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white"
+                       maxlength="15">
+            </div>
+
+            <!-- Character Select -->
+            <div class="w-full sm:w-1/2">
+                <label for="heroClassSelect" class="block text-sm font-medium text-gray-300">Choose Class:</label>
+                <select id="heroClassSelect" class="mt-1 block w-full p-2 rounded-lg bg-gray-700 border border-gray-600 text-white focus:ring-blue-500 focus:border-blue-500">
+                    <option value="0">⚔️ Balanced Blade</option>
+                    <option value="1">🛡️ Tanky Titan</option>
+                    <option value="2">🧙 Speedy Sorcerer</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Battle Area -->
+    <div id="battleArea" class="block">
+        <div class="flex justify-between items-end mb-4">
+            <!-- Hero Section -->
+            <div id="heroVisualContainer" class="flex flex-col items-center">
+                <div id="heroVisual" class="character-icon hero-icon">
+                    <span id="heroEmoji">⚔️</span>
+                </div>
+                <p id="heroNameDisplay" class="text-xl font-bold mt-2 text-white">Math Warrior</p>
+                <div class="health-bar-bg w-full min-w-[150px] mt-2">
+                    <div id="heroHealth" class="health-fill bg-green-500" style="width: 100%;"></div>
+                </div>
+                <p class="text-sm mt-1 text-green-400">Max HP: <span id="heroMaxHPDisplay">100</span></p>
+            </div>
+
+            <!-- Vs. Text -->
+            <div class="text-4xl font-black text-gray-500 mx-4 hidden sm:block">VS</div>
+
+            <!-- Monster Section -->
+            <div id="monsterVisualContainer" class="flex flex-col items-center">
+                <div id="monsterVisual" class="character-icon monster-icon">
+                    <span id="monsterEmoji">👹</span>
+                </div>
+                <p id="monsterName" class="text-xl font-bold mt-2 text-white">The Error Beast</p>
+                <div class="health-bar-bg w-full min-w-[150px] mt-2">
+                    <div id="monsterHealth" class="health-fill bg-red-500" style="width: 100%;"></div>
+                </div>
+                <p class="text-sm mt-1 text-red-400">Monster HP: <span id="monsterCurrentHPDisplay">100</span></p>
+            </div>
+        </div>
+        
+        <!-- Game Status, Question, and Input (FIXED HEIGHT) -->
+        <div class="content-area-fixed">
+            <!-- Timer Display -->
+            <div id="timerBox" class="hidden timer-box text-3xl font-extrabold p-1 rounded-lg bg-red-800 border-2 border-red-500 text-yellow-300">
+                <span id="timerTitle">Time Left:</span> <span id="timerDisplay">20</span>s
+            </div>
+
+            <!-- Message Box -->
+            <div id="messageBox" class="message-box">
+                Enter your hero name, choose your class, select a level, and press 'Start Battle' to begin!
+            </div>
+            
+            <!-- Question and Answer Input -->
+            <div id="gamePlayArea" class="hidden">
+                <div class="text-center">
+                    <div id="questionDisplay" class="text-xl font-extrabold text-white mb-3 inline-flex justify-center w-full"></div>
+                    <input type="text" id="answerInput" placeholder="Your Answer"
+                           class="p-3 text-xl rounded-lg bg-gray-700 border border-gray-600 text-white w-full sm:w-1/2 focus:ring-blue-500 focus:border-blue-500 text-center"
+                           onkeydown="if(event.key === 'Enter') checkAnswer()">
+                </div>
+                <div class="flex justify-center mt-4">
+                    <button onclick="checkAnswer()" id="submitButton" class="attack-btn text-white font-bold py-2 px-6 rounded-xl text-md uppercase tracking-wider">
+                        Submit Answer (Attack!)
+                    </button>
+                    <button onclick="skipQuestion()" id="skipButton" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-6 rounded-xl text-md uppercase tracking-wider ml-4">
+                        Skip (1 Use)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reward Screen -->
+    <div id="rewardArea" class="hidden mt-8 p-6 bg-gray-900 rounded-lg shadow-2xl">
+        <h2 class="text-3xl font-black text-center text-yellow-400 mb-6">🏆 Battle Won! Choose Your Reward 🏆</h2>
+        <div id="itemSelectionArea" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Item cards will be generated here -->
+        </div>
+    </div>
+    
+    <!-- Leaderboard Screen -->
+    <div id="leaderboardArea" class="hidden mt-8 p-6 bg-gray-900 rounded-lg shadow-2xl">
+        <h2 class="text-3xl font-black text-center text-green-400 mb-6">👑 Math Arena Champions 👑</h2>
+        <p id="yourScore" class="text-center text-xl font-bold mb-4 text-white"></p>
+        <table id="leaderboardTable" class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Rank</th>
+                    <th>Hero Name</th>
+                    <th>Level</th>
+                    <th>Time (s)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Leaderboard data will be inserted here -->
+            </tbody>
+        </table>
+        <p class="text-sm text-center text-gray-500 mt-4">🚧 Under Construction — The leaderboard will showcase the top completion times achieved by all players.</p>
+    </div>
+
+    <!-- Control Buttons -->
+    <div class="flex justify-center mt-6">
+        <button onclick="startGame()" id="startButton" class="attack-btn text-white font-bold py-3 px-8 rounded-xl text-lg uppercase tracking-wider">
+            Start Battle
+        </button>
+        <button onclick="resetGame()" id="resetButton" class="hidden bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-8 rounded-xl text-lg uppercase tracking-wider ml-4">
+            Start New Game
+        </button>
+    </div>
+
+</div>
+
+<script>
+    // --- Global Configuration ---
+    const MAX_HP_BASE = 100;
+    const MAX_STREAK = 3;
+    const TIME_PER_QUESTION = 20;
+    const FAIL_DAMAGE_HP = 15;
+    
+    const MONSTERS = [
+        { name: "The Error Beast", icon: '👹' },
+        { name: "The Algebra Horror", icon: '💀' },
+        { name: "The Calculus Terror", icon: '👾' },
+        { name: "The Trigonometry Tyrant", icon: '🐉' },
+        { name: "The Final Boss of Math", icon: '👑' }
+    ];
+
+    const HERO_CLASSES = [
+        { id: 0, name: "Balanced Blade", emoji: "⚔️", baseDamage: 15, baseHP: 100 },
+        { id: 1, name: "Tanky Titan", emoji: "🛡️", baseDamage: 12, baseHP: 115 },
+        { id: 2, name: "Speedy Sorcerer", emoji: "🧙", baseDamage: 18, baseHP: 85 }
+    ];
+
+    // --- NEW: Item Templates with Strategic Effects (12 Total) ---
+    const ITEM_TEMPLATES = {
+        // Base Items
+        'HP_UP': { name: "Potion of Resilience", desc: "+25 Max HP & current HP healed.", icon: "💖" },
+        'ATTACK_UP': { name: "Scroll of Power", desc: "+5 permanent Base Damage.", icon: "⚔️" },
+        'FUNNY_FAIL': { name: "Amulet of Luck", desc: "Next failure deals 0 damage (1-time use).", icon: "🍀" },
+        
+        // New Strategic Items
+        'TIME_BOOST': { name: "Clock of Haste", desc: "+5 seconds to the timer for the next 5 questions.", icon: "⏱️" },
+        'WEAKEN_MONSTER': { name: "Vial of Acid", desc: "Monster takes +25% damage for the next 3 correct answers.", icon: "🧪" },
+        'CRIT_CHANCE': { name: "Sharpening Stone", desc: "Next 3 hits have a 50% chance to be a 2x Critical Hit.", icon: "🔪" },
+        'STREAK_PROTECT': { name: "Iron Will Band", desc: "Next incorrect answer does NOT break your streak.", icon: "🔗" },
+        'TIMER_FREEZE': { name: "Hourglass of Stasis", desc: "The next question will have no timer (0 damage on fail).", icon: "⏳" },
+        'SUPER_CHARGE': { name: "Essence of Fury", desc: "Your next correct answer is a guaranteed Super Attack (3x).", icon: "⚡" },
+        'HP_DRAIN': { name: "Vampiric Touch", desc: "Next correct answer heals you for 50% of the damage dealt.", icon: "🩸" },
+        'SHIELD_WALL': { name: "Paladin's Aegis", desc: "Monster's next 2 attacks deal 50% less damage.", icon: "🛡️" },
+        'SKIP_QUESTION': { name: "Teleport Scroll", desc: "Allows skipping the next question with no penalty. (1-time use)", icon: "🌌" },
+    };
+
+    // --- Game State Variables ---
+    let heroHP, heroMaxHP, monsterHP, monsterMaxHP, currentLevel;
+    let currentQuestion = null;
+    let consecutiveCorrect = 0;
+    let battleNumber = 0; 
+    let currentHeroClass = HERO_CLASSES[0];
+    let timer = null; 
+    let timerValue = TIME_PER_QUESTION; 
+    let heroBaseDamage = HERO_CLASSES[0].baseDamage;
+    let startTime = null; // NEW: Start time for the game
+    let totalTimeSeconds = 0; // NEW: Total time in seconds
+
+    // --- NEW: Item Effect States ---
+    let funnyFailActive = false;
+    let timeBoostRounds = 0;
+    let weakenMonsterRounds = 0;
+    let critChanceRounds = 0;
+    let streakProtectActive = false;
+    let timerFreezeRounds = 0;
+    let superChargeActive = false;
+    let hpDrainActive = false;
+    let shieldWallRounds = 0;
+    let skipQuestionActive = false;
+
+    // --- DOM Elements ---
+    const gameAppEl = document.getElementById('gameApp');
+    const heroVisualContainerEl = document.getElementById('heroVisualContainer');
+    const monsterVisualEl = document.getElementById('monsterVisual');
+    const heroHealthEl = document.getElementById('heroHealth');
+    const monsterHealthEl = document.getElementById('monsterHealth');
+    const heroMaxHPDisplayEl = document.getElementById('heroMaxHPDisplay');
+    const monsterCurrentHPDisplayEl = document.getElementById('monsterCurrentHPDisplay');
+    const questionDisplayEl = document.getElementById('questionDisplay');
+    const answerInputEl = document.getElementById('answerInput');
+    const messageBoxEl = document.getElementById('messageBox');
+    const startButtonEl = document.getElementById('startButton');
+    const resetButtonEl = document.getElementById('resetButton');
+    const gamePlayAreaEl = document.getElementById('gamePlayArea');
+    const levelSelectEl = document.getElementById('level');
+    const heroClassSelectEl = document.getElementById('heroClassSelect');
+    const heroNameInputEl = document.getElementById('heroNameInput');
+    const heroNameDisplayEl = document.getElementById('heroNameDisplay');
+    const streakCountEl = document.getElementById('streakCount');
+    const battleCountEl = document.getElementById('battleCount');
+    const monsterNameEl = document.getElementById('monsterName');
+    const timerBoxEl = document.getElementById('timerBox');
+    const timerDisplayEl = document.getElementById('timerDisplay');
+    const timerTitleEl = document.getElementById('timerTitle');
+    const rewardAreaEl = document.getElementById('rewardArea');
+    const leaderboardAreaEl = document.getElementById('leaderboardArea');
+    const itemSelectionAreaEl = document.getElementById('itemSelectionArea');
+    const configPanelEl = document.getElementById('configPanel');
+    const skipButtonEl = document.getElementById('skipButton');
+
+    // --- Timer Logic ---
+    function resetTimer() {
+        if (timer) clearInterval(timer);
+        timerValue = TIME_PER_QUESTION;
+        timerDisplayEl.textContent = timerValue;
+        timerBoxEl.classList.remove('text-red-300');
+        timerBoxEl.classList.add('text-yellow-300');
+        timerTitleEl.textContent = 'Time Left:';
+    }
+
+    function startTimer() {
+        resetTimer();
+        
+        let currentTimerDuration = TIME_PER_QUESTION;
+        
+        if (timeBoostRounds > 0) {
+            currentTimerDuration += 5; // +5 seconds boost
+            timerTitleEl.textContent = 'Time Boost:';
+            timeBoostRounds--;
+        }
+        
+        if (timerFreezeRounds > 0) {
+            timerBoxEl.classList.add('hidden');
+            timerFreezeRounds--;
+            return;
+        } else {
+            timerBoxEl.classList.remove('hidden');
+        }
+        
+        timerValue = currentTimerDuration;
+        timerDisplayEl.textContent = timerValue;
+
+        timer = setInterval(() => {
+            timerValue--;
+            totalTimeSeconds++; // Increment total game time every second
+            timerDisplayEl.textContent = timerValue;
+
+            if (timerValue <= 5) {
+                timerBoxEl.classList.remove('text-yellow-300');
+                timerBoxEl.classList.add('text-red-300');
+            }
+
+            if (timerValue <= 0) {
+                stopTimer();
+                handleTimeOut();
+            }
+        }, 1000);
+    }
+
+    function stopTimer() {
+        if (timer) clearInterval(timer);
+        // Do not hide the box, just stop the timer
+    }
+
+    function handleTimeOut() {
+        consecutiveCorrect = 0;
+        
+        let damage = FAIL_DAMAGE_HP;
+        let message = `⏱️ TIME OUT! ${heroNameDisplayEl.textContent} lost ${damage} HP for hesitating!`;
+        
+        // Apply funnyFailActive effect here if needed, but per original request, funnyFail only works on incorrect answers. 
+        // For timeout, we follow the original design:
+        heroHP = Math.max(0, heroHP - damage);
+
+        messageBoxEl.className = 'message-box mb-4 text-red-400';
+        messageBoxEl.innerHTML = `${message} The correct answer was ${currentQuestion.answer}.`;
+        
+        // Apply hero damage effect
+        heroVisualContainerEl.classList.add('hero-damage-effect');
+        updateStreakDisplay();
+        updateHealthBars();
+
+        setTimeout(() => {
+            heroVisualContainerEl.classList.remove('hero-damage-effect');
+            if (checkGameOver()) return;
+            loadNextQuestion();
+        }, 1500);
+    }
+
+    // --- Damage Calculation ---
+
+    function getDamage(isHeroAttack, isSuper) {
+        let baseDamage = isHeroAttack ? (isSuper ? heroBaseDamage * 3 : heroBaseDamage) : 15;
+        
+        const battleFactor = 1 + battleNumber * 0.2; 
+
+        if (!isHeroAttack) {
+            // Monster damage increases heavily
+            const levelDamage = Math.floor(currentLevel / 3) * 5;
+            baseDamage += (levelDamage * battleFactor) + (baseDamage * battleFactor);
+            
+            // Item: Shield Wall reduces monster damage
+            if (shieldWallRounds > 0) {
+                baseDamage *= 0.5;
+                shieldWallRounds--;
+                showMessage(`🛡️ Shield Wall absorbed 50% of the monster's attack! ${shieldWallRounds} use(s) left.`, 'blue');
+            }
+        } else {
+            // Hero damage
+            baseDamage *= (1 / battleFactor);
+        }
+
+        return Math.round(baseDamage);
+    }
+
+    // --- Item Effect Helpers ---
+    function decrementItemRounds() {
+        // Decrement rounds for temporary buffs
+        if (weakenMonsterRounds > 0) weakenMonsterRounds--;
+        if (critChanceRounds > 0) critChanceRounds--;
+    }
+
+    // --- Game Logic ---
+
+    function updateHealthBars() {
+        const heroPercent = (heroHP / heroMaxHP) * 100;
+        heroHealthEl.style.width = `${Math.max(0, heroPercent)}%`;
+        heroHealthEl.style.backgroundColor = heroPercent > 50 ? '#48bb78' : heroPercent > 20 ? '#f6e05e' : '#f56565';
+        heroMaxHPDisplayEl.textContent = heroMaxHP;
+
+        const monsterPercent = (monsterHP / monsterMaxHP) * 100;
+        monsterHealthEl.style.width = `${Math.max(0, monsterPercent)}%`;
+        monsterHealthEl.style.backgroundColor = monsterPercent > 50 ? '#f56565' : monsterPercent > 20 ? '#f6ad55' : '#e53e3e';
+        monsterCurrentHPDisplayEl.textContent = monsterHP;
+    }
+
+    function generateQuestion(level, battleNum) {
+        // ... (Question generation logic remains the same, adjusted for LaTeX)
+        let q = '', a = 0;
+        const multiplier = 1 + battleNum * 0.15;
+        let num1, num2;
+
+        switch (parseInt(level)) {
+            case 1: 
+                const maxVal1 = Math.floor(20 * multiplier);
+                num1 = Math.floor(Math.random() * (maxVal1 - 5)) + 5;
+                num2 = Math.floor(Math.random() * (num1 - 1)) + 1;
+                if (Math.random() > 0.5) { q = `${num1} + ${num2} = ?`; a = num1 + num2; } 
+                else { q = `${num1} - ${num2} = ?`; a = num1 - num2; }
+                break;
+            case 3: 
+                const maxFactor = Math.floor(12 * multiplier);
+                num1 = Math.floor(Math.random() * (maxFactor - 2)) + 2;
+                num2 = Math.floor(Math.random() * (maxFactor - 2)) + 2;
+                if (Math.random() > 0.5) { q = `$${num1} \\times ${num2} = ? $`; a = num1 * num2; } 
+                else { a = num1 * num2; q = `$${a} \\div ${num1} = ? $`; a = num2; }
+                break;
+			case 6:
+				if (Math.random() > 0.5) { 
+					num1 = parseFloat((Math.random() * (10 * multiplier) + 1).toFixed(2));
+					num2 = parseFloat((Math.random() * (5 * multiplier) + 1).toFixed(2));
+
+					a = parseFloat((num1 + num2).toFixed(1));
+
+					q = `Round to 1 decimal place: $${num1} + ${num2} = ? $`;
+				} else { 
+					num1 = Math.floor(Math.random() * 5) + 2; 
+					num2 = Math.floor(Math.random() * (num1 - 1)) + 1; 
+
+					a = parseFloat((num2 / num1).toFixed(2));
+
+					q = `Round to 2 decimal places: What is $${num2}/${num1}$ as a decimal?`;
+				}
+				break;
+            case 9:
+				const type = Math.floor(Math.random() * 6); // 0–5 patterns
+				let xVal, A, B, C;
+
+				switch (type) {
+					// 0) ax + b = c
+					case 0:
+						A = Math.floor(Math.random() * 5) + 2; 
+						B = Math.floor(Math.random() * 15) + 3; 
+						xVal = Math.floor(Math.random() * 10) + 1;
+						C = A * xVal + B;
+						q = `Solve for x: $${A}x + ${B} = ${C}$`;
+						a = xVal;
+						break;
+
+					// 1) ax - b = c
+					case 1:
+						A = Math.floor(Math.random() * 5) + 2;
+						B = Math.floor(Math.random() * 10) + 1;
+						xVal = Math.floor(Math.random() * 10) + 1;
+						C = A * xVal - B;
+						q = `Solve for x: $${A}x - ${B} = ${C}$`;
+						a = xVal;
+						break;
+
+					// 2) b - ax = c
+					case 2:
+						A = Math.floor(Math.random() * 5) + 2;
+						xVal = Math.floor(Math.random() * 10) + 1;
+						B = A * xVal + (Math.floor(Math.random() * 10) + 3);
+						C = B - A * xVal;
+						q = `Solve for x: $${B} - ${A}x = ${C}$`;
+						a = xVal;
+						break;
+
+					// 3) (x + b)/a = c
+					case 3:
+						A = Math.floor(Math.random() * 4) + 2;
+						B = Math.floor(Math.random() * 10) + 1;
+						xVal = Math.floor(Math.random() * 10) + 1;
+						C = (xVal + B) / A;
+						q = `Solve for x: $\\frac{x + ${B}}{${A}} = ${C}$`;
+						a = xVal;
+						break;
+
+					// 4) a(x - b) = c
+					case 4:
+						A = Math.floor(Math.random() * 4) + 2;
+						B = Math.floor(Math.random() * 10) + 1;
+						xVal = Math.floor(Math.random() * 10) + 1;
+						C = A * (xVal - B);
+						q = `Solve for x: $${A}(x - ${B}) = ${C}$`;
+						a = xVal;
+						break;
+
+					// 5) ax + bx = c  → (a+b)x = c
+					case 5:
+						A = Math.floor(Math.random() * 4) + 1;
+						B = Math.floor(Math.random() * 4) + 1;
+						xVal = Math.floor(Math.random() * 10) + 1;
+						C = (A + B) * xVal;
+						q = `Solve for x: $${A}x + ${B}x = ${C}$`;
+						a = xVal;
+						break;
+				}
+
+				break;
+
+            case 12: 
+                const ops = ['sin(0)', 'cos(\\pi)', 'tan(\\pi/4)', 'x^2 deriv', '2x^3 deriv', '3x^2+2x deriv'];
+                const op = ops[Math.floor(Math.random() * ops.length)];
+
+                if (op.includes('deriv')) {
+                    if (op === 'x^2 deriv') { q = `Find the derivative of $f(x) = x^2$ at $x=${Math.floor(5 * multiplier) + 1}$`; a = 2 * (Math.floor(5 * multiplier) + 1); } 
+                    else if (op === '2x^3 deriv') { q = `Find the derivative of $f(x) = 2x^3$ at $x=1$`; a = 6; } 
+                    else { q = `Find the derivative of $f(x) = 3x^2 + 2x$ at $x=2$`; a = 14; }
+                } else {
+                    switch(op) {
+                        case 'sin(0)': q = '$\\sin(0) = ? $'; a = 0; break;
+                        case 'cos(\\pi)': q = '$\\cos(\\pi) = ? $'; a = -1; break;
+                        case 'tan(\\pi/4)': q = '$\\tan(\\pi/4) = ? $'; a = 1; break;
+                    }
+                }
+                break;
+        }
+
+        if (level >= 6) { a = parseFloat(a.toFixed(2)); } else { a = Math.round(a); }
+        return { question: q, answer: a };
+    }
+
+    function loadNextQuestion() {
+        stopTimer();
+        if (heroHP <= 0 || monsterHP <= 0) return;
+
+        rewardAreaEl.classList.add('hidden');
+        leaderboardAreaEl.classList.add('hidden');
+        document.getElementById('battleArea').classList.remove('hidden');
+
+        // Show skip button if active
+        if (skipQuestionActive) {
+            skipButtonEl.classList.remove('hidden');
+        } else {
+            skipButtonEl.classList.add('hidden');
+        }
+
+        currentQuestion = generateQuestion(currentLevel, battleNumber);
+        questionDisplayEl.innerHTML = currentQuestion.question; // Use innerHTML for LaTeX
+		MathJax.typesetPromise();   // <-- REQUIRED for LaTeX to show correctly
+        answerInputEl.value = '';
+        answerInputEl.focus();
+
+        startTimer();
+    }
+    
+    function skipQuestion() {
+        if (!skipQuestionActive) return;
+
+        stopTimer();
+        skipQuestionActive = false;
+        skipButtonEl.classList.add('hidden');
+        
+        showMessage(`🌌 Question skipped! No penalty incurred.`, 'blue');
+        
+        setTimeout(() => {
+            loadNextQuestion();
+        }, 1000);
+    }
+
+    function checkAnswer() {
+        if (!currentQuestion) return;
+        stopTimer(); 
+
+        const userAnswerStr = answerInputEl.value.trim();
+        let userAnswer;
+
+        if (currentLevel >= 6) {
+            userAnswer = parseFloat(userAnswerStr);
+            userAnswer = parseFloat(userAnswer.toFixed(2));
+        } else {
+            userAnswer = parseInt(userAnswerStr, 10);
+        }
+
+        const correctAnswer = currentQuestion.answer;
+        const isCorrect = userAnswer === correctAnswer;
+
+        if (isNaN(userAnswer) || userAnswerStr === '') {
+            showMessage("Please enter a valid number for your answer!", 'yellow');
+            startTimer(); 
+            return;
+        }
+
+        answerInputEl.disabled = true;
+        document.getElementById('submitButton').disabled = true;
+
+        if (isCorrect) {
+            handleCorrectAnswer();
+        } else {
+            handleIncorrectAnswer(correctAnswer);
+        }
+    }
+
+	function triggerAnimation(el, className) {
+		el.classList.remove(className);
+		void el.offsetWidth; // Force reflow
+		el.classList.add(className);
+	}
+
+    function handleCorrectAnswer() {
+        consecutiveCorrect++;
+        decrementItemRounds(); // Decrement timed effects
+        
+        let damageDealt = getDamage(true, false);
+        let message = `✅ Correct! ${heroNameDisplayEl.textContent} attacks ${monsterNameEl.textContent} for ${Math.round(damageDealt)} HP!`;
+        let superEffect = false;
+
+        // Item: Monster Weaken
+        if (weakenMonsterRounds > 0) {
+            damageDealt *= 1.25;
+            message = `🧪 Vial of Acid effect! Damage boosted by 25% for ${weakenMonsterRounds} hit(s) left. Total: ${Math.round(damageDealt)} HP!`;
+        }
+
+        // Item: Crit Chance
+        if (critChanceRounds > 0 && Math.random() < 0.5) {
+            damageDealt *= 2; // 2x crit damage
+            message = `🔪 CRITICAL HIT! Sharpening Stone bonus! Damage doubled! Total: ${Math.round(damageDealt)} HP!`;
+        }
+
+        // Item: Super Charge
+        if (superChargeActive) {
+            damageDealt = getDamage(true, true);
+            message = `⚡ ESSENCE OF FURY! Guaranteed Super Attack! ${monsterNameEl.textContent} takes ${Math.round(damageDealt)} HP!`;
+            superChargeActive = false;
+            superEffect = true;
+        }
+        
+        // Check for natural Super Attack
+        if (consecutiveCorrect >= MAX_STREAK && !superChargeActive) {
+            damageDealt = getDamage(true, true);
+            message = `🔥 SUPER ATTACK! Three in a row! You blast ${monsterNameEl.textContent} for ${Math.round(damageDealt)} HP!`;
+            consecutiveCorrect = 0;
+            superEffect = true;
+        }
+        
+        // Item: HP Drain
+        if (hpDrainActive) {
+            const healAmount = Math.round(damageDealt * 0.5);
+            heroHP = Math.min(heroMaxHP, heroHP + healAmount);
+            message += ` 🩸 Vampiric Touch heals you for ${healAmount} HP!`;
+            hpDrainActive = false;
+        }
+
+        // Apply visual effects
+        if (superEffect) {
+			triggerAnimation(gameAppEl, 'super-flash-effect');
+			triggerAnimation(monsterVisualEl, 'shake-effect');
+        }
+		
+		triggerAnimation(heroVisualContainerEl, 'hero-attack-effect');
+		triggerAnimation(monsterVisualEl, 'monster-damage-effect');
+		
+        monsterHP = Math.max(0, monsterHP - Math.round(damageDealt));
+        showMessage(message, 'green');
+        updateStreakDisplay();
+        updateHealthBars();
+        
+        setTimeout(() => {
+            heroVisualContainerEl.classList.remove('hero-attack-effect');
+            monsterVisualEl.classList.remove('monster-damage-effect');
+            gameAppEl.classList.remove('super-flash-effect');
+            monsterVisualEl.classList.remove('shake-effect');
+            answerInputEl.disabled = false;
+            document.getElementById('submitButton').disabled = false;
+            if (checkGameOver()) return;
+            loadNextQuestion();
+        }, 800);
+    }
+
+    function handleIncorrectAnswer(correctAnswer) {
+        let damageTaken = getDamage(false, false);
+        let message = `❌ WRONG! The correct answer was ${correctAnswer}. `;
+
+        // Item: Funny Fail / Amulet of Luck
+        if (funnyFailActive) {
+            damageTaken = 0;
+            funnyFailActive = false;
+            message += `The Amulet of Luck saved you! You take 0 damage.`;
+        }
+        
+        // Item: Streak Protect
+        let streakBroken = true;
+        if (streakProtectActive) {
+            streakBroken = false;
+            streakProtectActive = false;
+            message += `The Iron Will Band kept your streak intact!`;
+        } else {
+            consecutiveCorrect = 0;
+        }
+        
+        // Take damage
+        if (damageTaken > 0) {
+            heroHP = Math.max(0, heroHP - damageTaken);
+            message += `${monsterNameEl.textContent} strikes back, you lose ${damageTaken} HP!`;
+        }
+
+        showMessage(message, 'red');
+
+        // Apply visual effects
+		triggerAnimation(heroVisualContainerEl, 'hero-damage-effect');
+		triggerAnimation(monsterVisualEl, 'monster-attack-effect');
+
+        updateStreakDisplay();
+        updateHealthBars();
+
+        setTimeout(() => {
+            monsterVisualEl.classList.remove('monster-attack-effect');
+            heroVisualContainerEl.classList.remove('hero-damage-effect');
+            answerInputEl.disabled = false;
+            document.getElementById('submitButton').disabled = false;
+            if (checkGameOver()) return;
+            loadNextQuestion();
+        }, 1000);
+    }
+
+    function updateStreakDisplay() {
+        streakCountEl.textContent = `${consecutiveCorrect}`;
+    }
+    
+    function updateBattleDisplay() {
+        battleCountEl.textContent = `${battleNumber + 1}`;
+        const monsterData = MONSTERS[battleNumber % MONSTERS.length];
+        monsterNameEl.textContent = monsterData.name;
+        monsterVisualEl.querySelector('span').textContent = monsterData.icon;
+    }
+
+    function showMessage(msg, color) {
+        messageBoxEl.className = `message-box mb-4 text-${color}-400`;
+        messageBoxEl.innerHTML = msg;
+    }
+
+    function checkGameOver() {
+        if (heroHP <= 0) {
+            showMessage(`GAME OVER! ${heroNameDisplayEl.textContent} has been defeated!`, 'red');
+            endGame(false);
+            return true;
+        } else if (monsterHP <= 0) {
+            showMessage(`VICTORY! ${monsterNameEl.textContent} has been vanquished!`, 'green');
+            setTimeout(advanceBattleOrEndGame, 1500);
+            return true;
+        }
+        return false;
+    }
+
+    function advanceBattleOrEndGame() {
+        if (battleNumber + 1 >= MONSTERS.length) {
+            // Final Boss Defeated!
+            const endTime = performance.now();
+            // Recalculate totalTimeSeconds based on performance timing for accuracy
+            const totalTime = (endTime - startTime) / 1000; 
+            
+            showMessage(`CONGRATULATIONS! You defeated the Final Boss in ${totalTime.toFixed(2)} seconds!`, 'yellow');
+            
+            document.getElementById('yourScore').textContent = `Your Time (Level G${currentLevel}): ${totalTime.toFixed(2)} seconds`;
+            endGame(true);
+            
+        } else {
+            showRewardScreen();
+        }
+    }
+
+    function showRewardScreen() {
+        stopTimer();
+        document.getElementById('battleArea').classList.add('hidden');
+        gamePlayAreaEl.classList.add('hidden');
+        leaderboardAreaEl.classList.add('hidden');
+        rewardAreaEl.classList.remove('hidden');
+
+        itemSelectionAreaEl.innerHTML = '';
+        
+        // Select 3 unique items randomly from the list of all keys
+        const allItemKeys = Object.keys(ITEM_TEMPLATES);
+        const shuffledKeys = allItemKeys.sort(() => 0.5 - Math.random());
+        const selectedKeys = shuffledKeys.slice(0, 3);
+
+        selectedKeys.forEach(itemKey => {
+            const item = ITEM_TEMPLATES[itemKey];
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            card.innerHTML = `
+                <p class="text-5xl mb-2">${item.icon}</p>
+                <h3 class="text-xl font-bold text-blue-400 mb-2">${item.name}</h3>
+                <p class="text-sm font-normal text-gray-400">${item.desc}</p>
+            `;
+            card.onclick = () => applyItemEffect(itemKey);
+            itemSelectionAreaEl.appendChild(card);
+        });
+    }
+
+    function applyItemEffect(itemKey) {
+        // Disable all cards after selection
+        Array.from(itemSelectionAreaEl.children).forEach(card => card.onclick = null);
+
+        let message = '';
+
+        switch (itemKey) {
+            case 'HP_UP':
+                heroMaxHP += 25;
+                heroHP = Math.min(heroMaxHP, heroHP + 25);
+                message = `You consumed the Potion of Resilience! Max HP increased to ${heroMaxHP} and you healed 25 HP.`;
+                break;
+            case 'ATTACK_UP':
+                heroBaseDamage += 5;
+                message = `You read the Scroll of Power! Base Damage increased by 5 to ${heroBaseDamage}.`;
+                break;
+            case 'FUNNY_FAIL':
+                funnyFailActive = true;
+                message = `You equipped the Amulet of Luck! Your next incorrect answer will deal 0 damage.`;
+                break;
+            case 'TIME_BOOST':
+                timeBoostRounds = 5;
+                message = `You activate the Clock of Haste! The next 5 questions have +5 seconds on the timer.`;
+                break;
+            case 'WEAKEN_MONSTER':
+                weakenMonsterRounds = 3;
+                message = `You threw the Vial of Acid! The monster will take +25% damage for the next 3 hits.`;
+                break;
+            case 'CRIT_CHANCE':
+                critChanceRounds = 3;
+                message = `You used the Sharpening Stone! Your next 3 hits have a 50% chance of a 2x Critical Hit.`;
+                break;
+            case 'STREAK_PROTECT':
+                streakProtectActive = true;
+                message = `You wear the Iron Will Band! Your next wrong answer will NOT break your streak.`;
+                break;
+            case 'TIMER_FREEZE':
+                timerFreezeRounds = 1;
+                message = `The Hourglass of Stasis is active! The next question has no timer.`;
+                break;
+            case 'SUPER_CHARGE':
+                superChargeActive = true;
+                message = `The Essence of Fury flows through you! Your next hit is a guaranteed Super Attack.`;
+                break;
+            case 'HP_DRAIN':
+                hpDrainActive = true;
+                message = `Vampiric Touch: Your next correct answer will heal you for 50% of the damage dealt.`;
+                break;
+            case 'SHIELD_WALL':
+                shieldWallRounds = 2;
+                message = `Paladin's Aegis deployed! Monster's next 2 attacks deal 50% less damage.`;
+                break;
+            case 'SKIP_QUESTION':
+                skipQuestionActive = true;
+                message = `You gained a Teleport Scroll! You can skip the next question with no penalty.`;
+                break;
+            default:
+                message = "An unknown magic artifact was acquired.";
+        }
+        
+        showMessage(`🎉 ${message}`, 'yellow');
+        updateHealthBars();
+        
+        setTimeout(() => {
+            // Advance to the next battle
+            battleNumber++;
+            consecutiveCorrect = 0;
+            
+            monsterMaxHP = Math.round(MAX_HP_BASE * (1 + battleNumber * 0.1)); 
+            monsterHP = monsterMaxHP; 
+
+            updateHealthBars();
+            updateStreakDisplay();
+            updateBattleDisplay();
+
+            const monsterData = MONSTERS[battleNumber % MONSTERS.length];
+
+            showMessage(`🎉 A new challenger appears: ${monsterData.name}! Monster Max HP: ${monsterMaxHP}!`, 'purple');
+            
+            document.getElementById('battleArea').classList.remove('hidden');
+            rewardAreaEl.classList.add('hidden');
+            gamePlayAreaEl.classList.remove('hidden');
+            
+            loadNextQuestion();
+        }, 500);
+    }
+
+    function endGame(won) {
+        stopTimer();
+        gamePlayAreaEl.classList.add('hidden');
+        rewardAreaEl.classList.add('hidden');
+        startButtonEl.classList.add('hidden');
+        configPanelEl.classList.add('hidden');
+        resetButtonEl.classList.remove('hidden');
+        skipButtonEl.classList.add('hidden');
+        
+        if (won) {
+            document.getElementById('battleArea').classList.add('hidden');
+            leaderboardAreaEl.classList.remove('hidden');
+        } else {
+            // If lost, keep battle area visible but hide controls
+            leaderboardAreaEl.classList.add('hidden');
+        }
+    }
+
+    // --- Game Control Functions ---
+
+    function startGame() {
+        if (!startTime) {
+            startTime = performance.now(); // Start timer tracking
+            totalTimeSeconds = 0;
+        }
+        
+        // Set hero name and class
+        const heroName = heroNameInputEl.value.trim() || "Math Warrior";
+        heroNameDisplayEl.textContent = heroName;
+        const classIndex = parseInt(heroClassSelectEl.value);
+        currentHeroClass = HERO_CLASSES.find(c => c.id === classIndex) || HERO_CLASSES[0];
+        document.getElementById('heroEmoji').textContent = currentHeroClass.emoji;
+        
+        currentLevel = levelSelectEl.value;
+        heroMaxHP = currentHeroClass.baseHP;
+        heroHP = heroMaxHP;
+        heroBaseDamage = currentHeroClass.baseDamage; 
+
+        monsterMaxHP = MAX_HP_BASE; 
+        monsterHP = monsterMaxHP;
+        
+        consecutiveCorrect = 0;
+        battleNumber = 0; 
+
+        // Reset all item effects
+        funnyFailActive = false;
+        timeBoostRounds = 0;
+        weakenMonsterRounds = 0;
+        critChanceRounds = 0;
+        streakProtectActive = false;
+        timerFreezeRounds = 0;
+        superChargeActive = false;
+        hpDrainActive = false;
+        shieldWallRounds = 0;
+        skipQuestionActive = false;
+
+        // Show/hide UI elements
+        startButtonEl.classList.add('hidden');
+        resetButtonEl.classList.add('hidden');
+        configPanelEl.classList.remove('hidden');
+        gamePlayAreaEl.classList.remove('hidden');
+        rewardAreaEl.classList.add('hidden');
+        leaderboardAreaEl.classList.add('hidden');
+        document.getElementById('battleArea').classList.remove('hidden');
+
+        // Reset display
+        updateHealthBars();
+        updateStreakDisplay();
+        updateBattleDisplay();
+        showMessage(`Level G${currentLevel} Battle START! Go ${heroName}, the ${currentHeroClass.name}!`, 'blue');
+
+        setTimeout(loadNextQuestion, 1000);
+    }
+
+    function resetGame() {
+        // Reset time tracking
+        startTime = null; 
+        totalTimeSeconds = 0;
+        
+        // Reset state
+        heroHP = MAX_HP_BASE; heroMaxHP = MAX_HP_BASE; monsterHP = MAX_HP_BASE; monsterMaxHP = MAX_HP_BASE;
+        consecutiveCorrect = 0; battleNumber = 0;
+
+        // Reset item effects (redundant but safe)
+        funnyFailActive = false; timeBoostRounds = 0; weakenMonsterRounds = 0; critChanceRounds = 0;
+        streakProtectActive = false; timerFreezeRounds = 0; superChargeActive = false;
+        hpDrainActive = false; shieldWallRounds = 0; skipQuestionActive = false;
+
+        // UI Reset
+        updateHealthBars();
+        updateStreakDisplay();
+        updateBattleDisplay();
+        
+        const classIndex = parseInt(heroClassSelectEl.value);
+        currentHeroClass = HERO_CLASSES.find(c => c.id === classIndex) || HERO_CLASSES[0];
+        document.getElementById('heroEmoji').textContent = currentHeroClass.emoji;
+        heroNameDisplayEl.textContent = heroNameInputEl.value.trim() || "Math Warrior";
+
+        showMessage("Enter your hero name, choose your class, select a level, and press 'Start Battle' to begin!", 'yellow');
+        
+        startButtonEl.classList.remove('hidden');
+        resetButtonEl.classList.add('hidden');
+        configPanelEl.classList.remove('hidden');
+        gamePlayAreaEl.classList.add('hidden');
+        rewardAreaEl.classList.add('hidden');
+        leaderboardAreaEl.classList.add('hidden');
+        skipButtonEl.classList.add('hidden');
+        stopTimer();
+    }
+
+    // Initialize the game when the window loads
+    window.onload = function() {
+        const updateConfig = () => {
+            const classIndex = parseInt(heroClassSelectEl.value);
+            const selectedClass = HERO_CLASSES.find(c => c.id === classIndex) || HERO_CLASSES[0];
+            document.getElementById('heroEmoji').textContent = selectedClass.emoji;
+            heroNameDisplayEl.textContent = heroNameInputEl.value.trim() || "Math Warrior";
+            
+            if (!gamePlayAreaEl.classList.contains('hidden')) {
+                resetGame();
+            }
+        };
+
+        heroClassSelectEl.addEventListener('change', updateConfig);
+        heroNameInputEl.addEventListener('input', updateConfig);
+        levelSelectEl.addEventListener('change', updateConfig);
+
+        updateConfig();
+        updateHealthBars();
+        updateBattleDisplay();
+        
+        resetGame(); 
+    };
+</script>
+
+</body>
+</html>
