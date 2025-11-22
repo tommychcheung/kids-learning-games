@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Kids Learning Games</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Trebuchet MS', sans-serif;
+            background: linear-gradient(135deg, #a8e0ff, #fde2ff);
+            text-align: center;
+            color: #333;
+        }
+
+        header {
+            padding: 40px 20px;
+        }
+
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+        }
+
+        p.subtitle {
+            font-size: 1.2rem;
+            color: #444;
+            margin-top: -10px;
+        }
+
+        .game-list {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            padding: 40px 20px;
+            flex-wrap: wrap;
+        }
+
+        .game-card {
+            width: 260px;
+            padding: 25px;
+            border-radius: 20px;
+            background: white;
+            box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+            transition: transform 0.25s, box-shadow 0.25s;
+            cursor: pointer;
+        }
+
+        .game-card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 10px 22px rgba(0,0,0,0.25);
+        }
+
+        .game-icon {
+            font-size: 70px;
+            margin-bottom: 10px;
+        }
+
+        .game-title {
+            font-size: 1.5rem;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+
+        .game-desc {
+            font-size: 0.95rem;
+            color: #555;
+        }
+
+        footer {
+            margin-top: 40px;
+            padding: 20px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Kids Learning Games 🎉</h1>
+    <p class="subtitle">Fun • Interactive • Made Just for Smart Kids</p>
+</header>
+
+<div class="game-list">
+
+    <!-- Game: Math Quest -->
+    <a href="math-game/index.html" style="text-decoration:none; color:inherit;">
+        <div class="game-card">
+            <div class="game-icon">🧮⚔️</div>
+            <div class="game-title">Math Quest</div>
+            <div class="game-desc">Battle monsters by solving math problems! Level up your hero and unleash super attacks.</div>
+        </div>
+    </a>
+
+    <!-- Game: Reading Adventures -->
+    <a href="reading-game/index.html" style="text-decoration:none; color:inherit;">
+        <div class="game-card">
+            <div class="game-icon">📚🔍</div>
+            <div class="game-title">Reading Adventures</div>
+            <div class="game-desc">Boost comprehension skills with fun short stories, quizzes, and treasure hunts.</div>
+        </div>
+    </a>
+
+</div>
+
+<footer>
+    © 2025 Tommy’s Fun Learning Hub | Built with ❤️ for Tayla and Chester
+</footer>
+
+</body>
+</html>
