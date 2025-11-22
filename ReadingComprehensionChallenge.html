@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reading Comprehension Challenge</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for better readability and aesthetics */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .container {
+            max-width: 900px;
+        }
+        .option-button {
+            transition: all 0.2s;
+        }
+        .option-button:hover:not(.submitted) {
+            background-color: #e5e7eb;
+            transform: translateY(-1px);
+        }
+        /* Specific feedback colors */
+        .correct-answer {
+            background-color: #d1fae5 !important; /* Green 100 */
+            border-color: #34d399 !important; /* Green 400 */
+        }
+        .incorrect-answer {
+            background-color: #fee2e2 !important; /* Red 100 */
+            border-color: #f87171 !important; /* Red 400 */
+        }
+        .selected-wrong {
+            background-color: #fecaca !important; /* Red 200 */
+            border-color: #ef4444 !important; /* Red 500 */
+        }
+        .gemini-gradient {
+            background: linear-gradient(90deg, #4285F4, #34A853, #FBBC05, #EA4335);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // Removed onAuthStateChanged to prevent race condition.
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, setDoc, doc, updateDoc, query, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase access
+        window.firebase = {};
+
+        // Use the globally provided config and token
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        if (firebaseConfig) {
+            setLogLevel('Debug'); // Enable Firestore logging
+            const app = initializeApp(firebaseConfig);
+            window.firebase.db = getFirestore(app);
+            window.firebase.auth = getAuth(app);
+            window.firebase.appId = appId;
+            window.firebase.dbPath = `/artifacts/${appId}/public/data/user_profiles`;
+            // Expose Firestore functions globally within the module scope for use in component logic
+            window.firebase.firestore = { collection, onSnapshot, setDoc, doc, updateDoc, query };
+
+
+            const auth = window.firebase.auth;
+
+            // FIX: Ensure authentication completes before dispatching firebaseReady
+            const setupAuthAndDispatch = async () => {
+                let user = auth.currentUser;
+
+                if (!user) {
+                    // 1. Try signing in with custom token
+                    if (initialAuthToken) {
+                        try {
+                            const userCredential = await signInWithCustomToken(auth, initialAuthToken);
+                            user = userCredential.user;
+                        } catch (error) {
+                            console.warn("Custom token sign-in failed, falling back to anonymous.", error);
+                        }
+                    }
+
+                    // 2. Fallback to anonymous sign-in if no user or custom token failed
+                    if (!user) {
+                        try {
+                            const userCredential = await signInAnonymously(auth);
+                            user = userCredential.user;
+                        } catch (error) {
+                            console.error("Anonymous sign-in failed:", error);
+                        }
+                    }
+                }
+
+                if (user) {
+                    window.firebase.userId = user.uid;
+                    // Dispatch the event only when we are sure the user is authenticated and userId is set
+                    document.dispatchEvent(new Event('firebaseReady'));
+                }
+            };
+            
+            // Start the authentication process
+            setupAuthAndDispatch();
+
+        } else {
+            console.warn("Firebase configuration not found. Running application without persistent storage features.");
+            window.firebase.db = null;
+            window.firebase.auth = null;
+            window.firebase.userId = 'local-user-' + crypto.randomUUID();
+            document.dispatchEvent(new Event('firebaseReady'));
+        }
+    </script>
+</head>
+
+<body class="min-h-screen flex flex-col items-center p-4">
+
+    <div id="app-container" class="container bg-white shadow-xl rounded-2xl p-6 md:p-10 my-8 w-full">
+
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold gemini-gradient">
+                <span id="app-title">Reading Challenge</span>
+            </h1>
+            <p class="text-gray-500 mt-1">Select a grade level to generate a passage and quiz.</p>
+            <!-- User ID Display - Hidden as requested -->
+            <div id="user-id-display" class="text-xs mt-2 text-gray-400 hidden"></div>
+        </header>
+        
+        <!-- User Profile Management -->
+        <div id="profile-management-panel" class="bg-yellow-50 p-4 rounded-xl mb-6 shadow-md border-t-4 border-yellow-400">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+                <div class="w-full sm:w-1/2">
+                    <select id="profile-select" class="w-full p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-yellow-500 focus:border-yellow-500 transition duration-150" onchange="handleProfileChange(this.value)">
+                        <option value="">-- Select or Create Profile --</option>
+                        <!-- Profiles populated by JS -->
+                    </select>
+                </div>
+                <div class="w-full sm:w-1/2 flex items-center gap-2">
+                    <input type="text" id="new-profile-name" placeholder="Enter new reader's name" class="p-2 border border-gray-300 rounded-lg shadow-sm w-full" maxlength="20">
+                    <button id="add-profile-button" class="px-4 py-2 bg-yellow-600 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-700 transition duration-150 disabled:opacity-50" disabled>
+                        Add
+                    </button>
+                </div>
+            </div>
+            
+            <div id="current-profile-info" class="text-center p-3 border-t border-yellow-200">
+                <p class="text-lg font-bold text-gray-800">
+                    <span id="profile-name-display">No Profile Selected</span>
+                    <span id="accumulated-score-display" class="text-blue-600 ml-3">Score: 0</span>
+                </p>
+                <!-- Reward Goal Message -->
+                <p class="text-sm text-yellow-800 mt-1 font-extrabold">Goal: Claim 10 minutes of TV time every 50 points!</p>
+            </div>
+        </div>
+
+
+        <!-- Level Selector and Action Panel -->
+        <div id="control-panel" class="flex flex-col sm:flex-row items-center justify-between p-4 bg-blue-50 rounded-xl mb-6 shadow-inner">
+            <div class="flex items-center space-x-2 w-full sm:w-auto mb-4 sm:mb-0">
+                <label for="level-select" class="font-semibold text-gray-700">Level:</label>
+                <select id="level-select" class="p-2 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 transition duration-150">
+                    <!-- Options populated by JS -->
+                </select>
+            </div>
+            <button id="generate-button" class="w-full sm:w-auto px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Generate New Quiz
+            </button>
+        </div>
+
+        <!-- Quiz Content Area -->
+        <div id="quiz-area" class="space-y-8">
+            <div id="loading-indicator" class="hidden text-center p-10">
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p class="mt-4 text-lg text-blue-600 font-medium">Generating Passage and Questions...</p>
+                <p class="text-sm text-gray-500">This may take a moment as the AI crafts your lesson.</p>
+            </div>
+
+            <!-- Passage Section -->
+            <div id="passage-card" class="hidden bg-white p-6 border border-gray-200 rounded-xl shadow-md">
+                <h2 id="passage-title" class="text-2xl font-bold text-gray-800 mb-3"></h2>
+                <div id="passage-text" class="text-gray-700 leading-relaxed text-base whitespace-pre-wrap"></div>
+            </div>
+
+            <!-- Questions Section - Now shows only one question at a time -->
+            <div id="questions-card" class="hidden space-y-6">
+                <h2 class="text-2xl font-bold text-gray-800 border-b pb-2">Comprehension Questions</h2>
+                
+                <!-- Progress Indicator for Single Question View -->
+                <div id="progress-indicator" class="text-lg font-semibold text-center text-blue-600"></div>
+                
+                <div id="questions-container" class="space-y-8">
+                    <!-- The current question will be rendered here -->
+                </div>
+
+                <!-- Navigation Buttons -->
+                <div class="flex justify-between space-x-4 pt-4">
+                    <button id="prev-button" class="px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg shadow-md hover:bg-gray-400 transition duration-150 ease-in-out disabled:opacity-50" disabled>
+                        Previous
+                    </button>
+                    <!-- Container to hold either Next or Submit button -->
+                    <div id="action-button-container" class="w-auto">
+                        <button id="next-button" class="px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition duration-150 ease-in-out disabled:opacity-50">
+                            Next
+                        </button>
+                        <button id="submit-button" class="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-md hover:bg-green-700 transition duration-150 ease-in-out disabled:opacity-50 hidden">
+                            Submit Answers
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="results-panel" class="hidden p-5 border border-dashed rounded-xl space-y-4">
+                    <div id="score-display" class="text-2xl font-bold text-center"></div>
+                    <button id="next-challenge-button" class="w-full px-6 py-3 text-white font-semibold rounded-lg shadow-lg transition duration-150 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed">
+                        <!-- Button text updated by JS -->
+                    </button>
+                </div>
+            </div>
+        </div>
+        <!-- API Citation Container -->
+        <div id="citation-container" class="mt-8 pt-4 border-t border-gray-200 hidden">
+            <h3 class="text-sm font-semibold text-gray-600 mb-2">Sources Used:</h3>
+            <ul id="citations" class="text-sm text-gray-500 space-y-1">
+                <!-- Citations rendered here -->
+            </ul>
+        </div>
+    </div>
+
+    <script type="module">
+        // Gemini API Configuration
+        const API_KEY = ""; // Canvas will provide this at runtime
+        const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
+        const MAX_RETRIES = 5;
+
+        // Application State
+        const state = {
+            currentLevel: 1,
+            quizData: null,
+            userAnswers: new Array(5).fill(null), // Stores the index of the selected option (0, 1, 2, or 3)
+            currentQuestionIndex: 0, // Index of the question currently displayed (0-4)
+            score: 0,
+            isSubmitted: false,
+            isLoading: false,
+            isFirebaseReady: false,
+            // New State for User Profiles
+            userProfiles: [],
+            currentProfileId: null,
+            currentProfileName: 'No Profile Selected',
+            currentAccumulatedScore: 0,
+            rewardThreshold: 10 // Reward threshold set to 50
+        };
+
+        // DOM Elements
+        const $ = (id) => document.getElementById(id);
+        const elements = {
+            levelSelect: $('level-select'),
+            generateButton: $('generate-button'),
+            loadingIndicator: $('loading-indicator'),
+            passageCard: $('passage-card'),
+            passageTitle: $('passage-title'),
+            passageText: $('passage-text'),
+            questionsCard: $('questions-card'),
+            questionsContainer: $('questions-container'),
+            submitButton: $('submit-button'),
+            nextButton: $('next-button'),
+            prevButton: $('prev-button'),
+            resultsPanel: $('results-panel'),
+            scoreDisplay: $('score-display'),
+            nextChallengeButton: $('next-challenge-button'),
+            citationContainer: $('citation-container'),
+            citations: $('citations'),
+            userIdDisplay: $('user-id-display'),
+            progressIndicator: $('progress-indicator'),
+            // New Profile DOM Elements
+            profileSelect: $('profile-select'),
+            newProfileName: $('new-profile-name'),
+            addProfileButton: $('add-profile-button'),
+            profileNameDisplay: $('profile-name-display'),
+            accumulatedScoreDisplay: $('accumulated-score-display'),
+        };
+
+        // Utility: Set up the Level Selector options
+        for (let i = 1; i <= 12; i++) {
+            const option = document.createElement('option');
+            option.value = i;
+            option.textContent = `Grade ${i}`;
+            elements.levelSelect.appendChild(option);
+        }
+        elements.levelSelect.value = state.currentLevel;
+
+        // Utility function to update profile info display
+        const updateProfileInfoDisplay = () => {
+            elements.profileNameDisplay.textContent = state.currentProfileName;
+            elements.accumulatedScoreDisplay.textContent = `Score: ${state.currentAccumulatedScore}`;
+            elements.generateButton.disabled = state.isLoading || !state.isFirebaseReady || !state.currentProfileId;
+        }
+        
+        // Expose handleProfileChange to the global scope for the onchange attribute
+        window.handleProfileChange = (profileId) => {
+            if (profileId === "") {
+                state.currentProfileId = null;
+                state.currentProfileName = 'No Profile Selected';
+                state.currentAccumulatedScore = 0;
+            } else {
+                const profile = state.userProfiles.find(p => p.id === profileId);
+                if (profile) {
+                    state.currentProfileId = profile.id;
+                    state.currentProfileName = profile.name;
+                    state.currentAccumulatedScore = profile.accumulatedScore || 0;
+                    elements.profileSelect.value = profileId; // Ensure the select reflects the change
+                }
+            }
+            updateProfileInfoDisplay();
+            clearQuizState();
+            updateUI();
+        }
+
+        // --- Firestore Profile Management ---
+
+        const loadUserProfiles = () => {
+            // Check for both Firebase readiness and the necessary Firestore functions
+            if (!window.firebase.db || !window.firebase.firestore || !state.isFirebaseReady) return;
+
+            const { collection, onSnapshot, query } = window.firebase.firestore;
+            const profilesCol = collection(window.firebase.db, window.firebase.dbPath);
+            const q = query(profilesCol);
+
+            // Set up real-time listener for profiles
+            onSnapshot(q, (snapshot) => {
+                const profiles = [];
+                snapshot.forEach((doc) => {
+                    profiles.push({ id: doc.id, ...doc.data() });
+                });
+                state.userProfiles = profiles;
+                renderProfileSelector();
+            }, (error) => {
+                console.error("Error listening to user profiles: " + error.message, error);
+            });
+        };
+
+        const renderProfileSelector = () => {
+            const select = elements.profileSelect;
+            const currentSelectedId = state.currentProfileId;
+            select.innerHTML = '<option value="">-- Select or Create Profile --</option>';
+
+            let profileFound = false;
+            state.userProfiles.forEach(profile => {
+                const option = document.createElement('option');
+                option.value = profile.id;
+                option.textContent = `${profile.name} (Total: ${profile.accumulatedScore || 0})`;
+                select.appendChild(option);
+
+                if (profile.id === currentSelectedId) {
+                    select.value = currentSelectedId;
+                    state.currentProfileName = profile.name;
+                    state.currentAccumulatedScore = profile.accumulatedScore || 0;
+                    profileFound = true;
+                }
+            });
+
+            if (!profileFound && currentSelectedId) {
+                // If current profile was deleted, reset state
+                window.handleProfileChange("");
+            } else if (!currentSelectedId && state.userProfiles.length > 0) {
+                 // Auto-select the first profile if none is selected
+                 window.handleProfileChange(state.userProfiles[0].id);
+            }
+            updateProfileInfoDisplay();
+        };
+
+        const addProfile = async () => {
+            const name = elements.newProfileName.value.trim();
+            if (!name || state.isLoading || !window.firebase.firestore) return;
+
+            const { collection, setDoc, doc } = window.firebase.firestore;
+
+            // Simple check to prevent duplicate names, though Firestore IDs are unique
+            if (state.userProfiles.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+                alertBox("Duplicate Name", `A profile named "${name}" already exists.`);
+                return;
+            }
+            
+            elements.addProfileButton.disabled = true;
+            elements.newProfileName.disabled = true;
+
+            const newProfileData = {
+                name: name,
+                accumulatedScore: 0,
+                lastUpdated: new Date().toISOString(),
+                // Using the unique Firebase Auth ID as part of the document ensures the user has write access per security rules.
+                creatorId: window.firebase.userId, 
+            };
+
+            try {
+                // Add the new document
+                const profilesCol = collection(window.firebase.db, window.firebase.dbPath);
+                // We'll let Firestore generate the ID by using doc() without arguments
+                const newDocRef = doc(profilesCol);
+                await setDoc(newDocRef, newProfileData);
+                
+                // Select the new profile automatically
+                window.handleProfileChange(newDocRef.id);
+                
+                elements.newProfileName.value = '';
+            } catch (e) {
+                console.error("Error adding profile: ", e);
+                alertBox("Error", "Could not create profile. Check console for details.");
+            } finally {
+                elements.addProfileButton.disabled = false;
+                elements.newProfileName.disabled = false;
+            }
+        };
+        
+        // --- Reward Functions ---
+
+        const claimReward = async (profileId, currentScore) => {
+            if (!window.firebase.db || !profileId || !window.firebase.firestore) return;
+
+            const { doc, updateDoc } = window.firebase.firestore;
+            const profileRef = doc(window.firebase.db, window.firebase.dbPath, profileId);
+            const deduction = state.rewardThreshold;
+            
+            // Calculate the new score. This relies on the currentScore being passed from the state.
+            const newScore = currentScore - deduction;
+
+            try {
+                await updateDoc(profileRef, {
+                    accumulatedScore: newScore,
+                    lastClaimed: new Date().toISOString(),
+                });
+                alertBox("Success!", `You claimed your 10 minutes of TV time! ${deduction} points have been deducted from your score. Keep reading!`);
+            } catch (e) {
+                console.error("Error claiming reward: ", e);
+                alertBox("Error", "Could not claim reward. Check console for details.");
+            }
+        };
+        
+        const showRewardModal = (profileId, currentScore) => {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-yellow-100 rounded-xl shadow-2xl p-6 w-11/12 max-w-sm border-t-8 border-yellow-500">
+                    <h3 class="text-2xl font-bold text-yellow-800 mb-2 text-center">🏆 Reward Time! 🏆</h3>
+                    <p class="text-yellow-700 mb-4 text-center text-lg font-semibold">You've earned a prize!</p>
+                    <div class="p-4 bg-white rounded-lg border border-yellow-300 mb-6 shadow-inner">
+                        <p class="text-gray-800 text-xl font-extrabold text-center">Show this screen to Daddy!</p>
+                        <p class="text-gray-600 text-sm mt-2 text-center">You've reached ${state.rewardThreshold} points (or a multiple of it) and earned 10 minutes of extra TV time!</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button id="modal-close" class="flex-1 px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition duration-150">Not Now</button>
+                        <button id="claim-reward-button" class="flex-1 px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-lg hover:bg-green-700 transition duration-150">
+                            Claim Reward (-${state.rewardThreshold} Pts)
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+
+            const closeModal = () => modal.remove();
+            $('modal-close').addEventListener('click', closeModal);
+            $('claim-reward-button').addEventListener('click', () => {
+                closeModal();
+                // When claiming, pass the current profile's total score for deduction
+                claimReward(profileId, currentScore);
+            });
+        };
+
+        const updateProfileScore = async (newScore) => {
+            if (!window.firebase.db || !state.currentProfileId || !window.firebase.firestore) return;
+
+            const { doc, updateDoc } = window.firebase.firestore;
+            const profileRef = doc(window.firebase.db, window.firebase.dbPath, state.currentProfileId);
+            
+            const oldAccumulatedScore = state.currentAccumulatedScore; 
+            const newAccumulatedScore = oldAccumulatedScore + newScore;
+            
+            const threshold = state.rewardThreshold;
+            const previousThresholdsReached = Math.floor(oldAccumulatedScore / threshold);
+            const newThresholdsReached = Math.floor(newAccumulatedScore / threshold);
+
+            try {
+                await updateDoc(profileRef, {
+                    accumulatedScore: newAccumulatedScore,
+                    lastUpdated: new Date().toISOString(),
+                });
+
+                // If the score update crossed a threshold, trigger the modal.
+                // We use newAccumulatedScore for the modal message before the deduction occurs.
+                if (newThresholdsReached > previousThresholdsReached) {
+                    showRewardModal(state.currentProfileId, newAccumulatedScore);
+                }
+
+            } catch (e) {
+                console.error("Error updating score: ", e);
+                alertBox("Error", "Could not save your score. Check console for details.");
+            }
+        };
+
+
+        // --- Firebase/Auth Ready Listener ---
+        document.addEventListener('firebaseReady', () => {
+            state.isFirebaseReady = true;
+            loadUserProfiles(); // Start listening for profiles
+            elements.generateButton.disabled = false;
+            elements.addProfileButton.disabled = false;
+            elements.newProfileName.addEventListener('input', () => {
+                elements.addProfileButton.disabled = elements.newProfileName.value.trim() === '';
+            });
+        });
+
+        // --- Gemini API Function ---
+
+        // Exponential backoff utility for API retries
+        const exponentialBackoffFetch = async (url, options, maxRetries = MAX_RETRIES) => {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    const response = await fetch(url, options);
+                    if (response.ok) {
+                        return response;
+                    }
+                    if (response.status === 429 && i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw new Error(`API request failed with status ${response.status}`);
+                } catch (error) {
+                    if (i < maxRetries - 1) {
+                        const delay = Math.pow(2, i) * 1000 + Math.random() * 1000;
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                        continue;
+                    }
+                    throw new Error(`All ${maxRetries} API attempts failed.`);
+                }
+            }
+        };
+
+        const fetchQuiz = async (level) => {
+            if (state.isLoading || !state.currentProfileId) {
+                 if (!state.currentProfileId) {
+                    alertBox("Profile Required", "Please select or create a reader profile before generating a quiz.");
+                 }
+                 return;
+            }
+
+            state.isLoading = true;
+            updateUI(); // Show loading indicator
+            clearQuizState();
+            
+            console.log("Fetching Quiz for Grade:", level);
+
+            const systemPrompt = `You are a specialized content generator for educational reading comprehension exercises tailored to Canadian school grades (G1-G12). Your task is to create a single, engaging, age-appropriate reading passage and exactly 5 accompanying multiple-choice questions with 4 options each. The passage difficulty must match Grade ${level}. The questions must be balanced: some should be direct recall, and others must require inference or be phrased using synonyms/different wordings than the text to test deeper comprehension. Output a single JSON object.`;
+
+            const userQuery = `Generate a reading comprehension exercise for Canadian Grade ${level}. Ensure the passage length and complexity are appropriate for this grade level.`;
+
+            const responseSchema = {
+                type: "OBJECT",
+                properties: {
+                    title: { type: "STRING", description: "A concise title for the passage." },
+                    level: { type: "STRING", description: "The grade level this quiz is for." },
+                    passage: { type: "STRING", description: "The full reading passage/story." },
+                    questions: {
+                        type: "ARRAY",
+                        description: "Exactly 5 multiple-choice questions.",
+                        items: {
+                            type: "OBJECT",
+                            properties: {
+                                text: { type: "STRING", description: "The question text." },
+                                options: {
+                                    type: "ARRAY",
+                                    description: "Exactly 4 options for the multiple choice question.",
+                                    items: { type: "STRING" }
+                                },
+                                correctIndex: { type: "INTEGER", description: "The 0-based index (0, 1, 2, or 3) of the correct answer within the options array." }
+                            },
+                            required: ["text", "options", "correctIndex"]
+                        }
+                    }
+                },
+                required: ["title", "level", "passage", "questions"]
+            };
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: responseSchema
+                },
+            };
+
+            try {
+                const response = await exponentialBackoffFetch(API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    const jsonString = candidate.content.parts[0].text;
+                    const data = JSON.parse(jsonString);
+                    state.quizData = data;
+
+                    // Extract and display citations
+                    let sources = [];
+                    const groundingMetadata = candidate.groundingMetadata;
+                    if (groundingMetadata && groundingMetadata.groundingAttributions) {
+                        sources = groundingMetadata.groundingAttributions
+                            .map(attribution => ({
+                                uri: attribution.web?.uri,
+                                title: attribution.web?.title,
+                            }))
+                            .filter(source => source.uri && source.title);
+                    }
+                    renderCitations(sources);
+
+                } else {
+                    throw new Error("API response was invalid or empty.");
+                }
+
+            } catch (error) {
+                console.error("Error fetching or parsing quiz data:", error);
+                alertBox("Error", "Could not generate quiz. Please try again or select a different level.");
+            } finally {
+                state.isLoading = false;
+                updateUI();
+            }
+        };
+
+        // --- Game Logic ---
+
+        const updateUI = () => {
+            const { quizData, isSubmitted, isLoading, currentLevel, score, currentQuestionIndex, currentProfileId } = state;
+            const totalQuestions = quizData ? quizData.questions.length : 0;
+            const isLastQuestion = currentQuestionIndex === totalQuestions - 1;
+
+            elements.generateButton.disabled = isLoading || !state.isFirebaseReady || !currentProfileId;
+            elements.levelSelect.disabled = isLoading;
+            elements.loadingIndicator.classList.toggle('hidden', !isLoading);
+
+            if (isLoading || !currentProfileId) {
+                elements.passageCard.classList.add('hidden');
+                elements.questionsCard.classList.add('hidden');
+                elements.citationContainer.classList.add('hidden');
+                elements.submitButton.classList.add('hidden');
+                elements.nextButton.classList.add('hidden');
+                elements.prevButton.classList.add('hidden');
+                elements.resultsPanel.classList.add('hidden');
+                return;
+            }
+            
+            if (!quizData) {
+                elements.passageCard.classList.add('hidden');
+                elements.questionsCard.classList.add('hidden');
+                elements.citationContainer.classList.add('hidden');
+                return;
+            }
+
+            elements.passageCard.classList.remove('hidden');
+            elements.questionsCard.classList.remove('hidden');
+            
+            // 1. Render Passage
+            elements.passageTitle.textContent = quizData.title;
+            elements.passageText.textContent = quizData.passage;
+
+            // 2. Render Current Question
+            elements.questionsContainer.innerHTML = '';
+            const qIndex = currentQuestionIndex;
+            const q = quizData.questions[qIndex];
+
+            // Progress Indicator
+            elements.progressIndicator.textContent = `Question ${qIndex + 1} / ${totalQuestions}`;
+
+            const questionEl = document.createElement('div');
+            questionEl.className = 'p-4 bg-gray-50 border border-gray-100 rounded-lg space-y-3';
+            questionEl.innerHTML = `<p class="font-semibold text-gray-800">${q.text}</p>`;
+
+            q.options.forEach((optionText, optIndex) => {
+                const button = document.createElement('button');
+                button.textContent = optionText;
+                button.className = `option-button w-full text-left p-3 border border-gray-300 rounded-lg shadow-sm hover:bg-gray-100 transition duration-150 ${isSubmitted ? 'submitted' : ''}`;
+                button.setAttribute('data-q-index', qIndex);
+                button.setAttribute('data-opt-index', optIndex);
+
+                // Add selection handler
+                if (!isSubmitted) {
+                    button.addEventListener('click', () => handleSelection(qIndex, optIndex));
+                }
+
+                // Handle display for selected/submitted state
+                if (state.userAnswers[qIndex] === optIndex) {
+                    button.classList.add('bg-blue-100', 'border-blue-500'); // Selected style
+                }
+
+                if (isSubmitted) {
+                    const isCorrect = optIndex === q.correctIndex;
+                    const isUserSelection = state.userAnswers[qIndex] === optIndex;
+
+                    button.disabled = true;
+
+                    if (isCorrect) {
+                        button.classList.add('correct-answer', 'font-bold');
+                        button.classList.remove('bg-blue-100', 'border-blue-500');
+                    } else if (isUserSelection) {
+                        button.classList.add('selected-wrong', 'font-bold');
+                        button.classList.remove('bg-blue-100', 'border-blue-500');
+                    }
+                }
+
+                questionEl.appendChild(button);
+            });
+            elements.questionsContainer.appendChild(questionEl);
+
+
+            // 3. Handle Navigation and Submission/Results
+
+            // Previous Button (Always visible, disabled if on Q1)
+            elements.prevButton.disabled = currentQuestionIndex === 0;
+
+            if (isSubmitted) {
+                // POST-SUBMISSION REVIEW MODE
+                // Both Next and Submit buttons use the Next button slot, but Submit is hidden
+                elements.prevButton.classList.remove('hidden');
+                elements.nextButton.classList.remove('hidden');
+                elements.nextButton.disabled = isLastQuestion; // Disable Next on the last question
+                elements.submitButton.classList.add('hidden'); 
+                elements.resultsPanel.classList.remove('hidden');
+            } else {
+                // PRE-SUBMISSION QUIZ MODE
+                elements.resultsPanel.classList.add('hidden');
+                
+                // Next Button: Visible, disabled on the last question (as requested)
+                elements.prevButton.classList.remove('hidden');
+                elements.nextButton.classList.remove('hidden'); 
+                elements.nextButton.disabled = isLastQuestion;
+                
+                // Submit Button: Only visible on the last question, replacing the Next button logic
+                elements.submitButton.classList.toggle('hidden', !isLastQuestion);
+                elements.submitButton.disabled = state.userAnswers.includes(null);
+            }
+
+            if (isSubmitted) {
+                const scoreText = `You scored: ${score} / ${totalQuestions} marks!`;
+
+                elements.scoreDisplay.innerHTML = `<span class="${score === totalQuestions ? 'text-green-600' : 'text-red-500'}">${scoreText}</span>`;
+
+                // Logic for Next Challenge Button
+                elements.nextChallengeButton.classList.remove('bg-green-600', 'bg-blue-600');
+                if (score === totalQuestions) {
+                    elements.nextChallengeButton.textContent = `Challenge Grade ${currentLevel + 1}`;
+                    elements.nextChallengeButton.classList.add('bg-green-600', 'hover:bg-green-700');
+                    elements.nextChallengeButton.disabled = currentLevel >= 12;
+                } else {
+                    elements.nextChallengeButton.textContent = `Try Grade ${currentLevel} Again`;
+                    elements.nextChallengeButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    elements.nextChallengeButton.disabled = false;
+                }
+            }
+        };
+
+        const clearQuizState = () => {
+            state.quizData = null;
+            state.userAnswers = new Array(5).fill(null);
+            state.currentQuestionIndex = 0; // Reset index
+            state.score = 0;
+            state.isSubmitted = false;
+        };
+
+        const handleSelection = (qIndex, optIndex) => {
+            if (state.isSubmitted) return;
+            state.userAnswers[qIndex] = optIndex;
+            updateUI();
+        };
+
+        const handleSubmit = () => {
+            if (state.isSubmitted || state.userAnswers.includes(null) || !state.currentProfileId) return;
+
+            let calculatedScore = 0;
+            const questions = state.quizData.questions;
+
+            questions.forEach((q, index) => {
+                if (state.userAnswers[index] === q.correctIndex) {
+                    calculatedScore++;
+                }
+            });
+            
+            // Score for this quiz (max 5 points, one point per question)
+            const quizScore = calculatedScore;
+            
+            // 1. Update Profile in Firestore
+            updateProfileScore(quizScore);
+
+            // 2. Update local state and UI for quiz review
+            state.score = quizScore;
+            state.isSubmitted = true;
+            updateUI();
+        };
+        
+        const handleNextQuestion = () => {
+            if (state.quizData && state.currentQuestionIndex < state.quizData.questions.length - 1) {
+                state.currentQuestionIndex++;
+                updateUI();
+            }
+        };
+
+        const handlePrevQuestion = () => {
+            if (state.currentQuestionIndex > 0) {
+                state.currentQuestionIndex--;
+                updateUI();
+            }
+        };
+
+        const handleNextChallenge = () => {
+            if (state.isSubmitted && state.score === state.quizData.questions.length) {
+                // Perfect score: challenge next level
+                const nextLevel = Math.min(state.currentLevel + 1, 12);
+                state.currentLevel = nextLevel;
+                elements.levelSelect.value = nextLevel;
+                fetchQuiz(nextLevel);
+            } else {
+                // Did not get full score: try same level again
+                fetchQuiz(state.currentLevel);
+            }
+        };
+
+        const handleLevelChange = (event) => {
+            state.currentLevel = parseInt(event.target.value);
+            clearQuizState();
+            updateUI();
+        };
+
+        const handleGenerateNewQuiz = () => {
+            fetchQuiz(state.currentLevel);
+        };
+
+        const renderCitations = (sources) => {
+            elements.citations.innerHTML = '';
+            if (sources.length > 0) {
+                elements.citationContainer.classList.remove('hidden');
+                sources.forEach((source, index) => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<a href="${source.uri}" target="_blank" class="text-blue-500 hover:text-blue-700 hover:underline transition duration-150">${source.title || 'Source ' + (index + 1)}</a>`;
+                    elements.citations.appendChild(li);
+                });
+            } else {
+                 elements.citationContainer.classList.add('hidden');
+            }
+        };
+
+        const alertBox = (title, message) => {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl shadow-2xl p-6 w-11/12 max-w-sm">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">${title}</h3>
+                    <p class="text-gray-600 mb-6">${message}</p>
+                    <button id="modal-close" class="w-full px-4 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150">Close</button>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            $('modal-close').addEventListener('click', () => modal.remove());
+        };
+
+        // --- Event Listeners ---
+        elements.levelSelect.addEventListener('change', handleLevelChange);
+        elements.generateButton.addEventListener('click', handleGenerateNewQuiz);
+        elements.submitButton.addEventListener('click', handleSubmit);
+        elements.nextChallengeButton.addEventListener('click', handleNextChallenge);
+        elements.prevButton.addEventListener('click', handlePrevQuestion);
+        elements.nextButton.addEventListener('click', handleNextQuestion);
+        elements.addProfileButton.addEventListener('click', addProfile);
+
+        // Initial UI Update (sets up the initial state)
+        updateUI();
+
+    </script>
+</body>
+</html>
